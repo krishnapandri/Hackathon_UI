@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { generateSqlQuery } from "./services/openai";
+import { generateSqlQuery } from "./services/groq";
 import { sqlQueryRequest } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {

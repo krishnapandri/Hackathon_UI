@@ -1,9 +1,8 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { SqlQueryRequest, SqlQueryResponse } from "@shared/schema";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_ENV_VAR || "default_key" 
+const groq = new Groq({ 
+  apiKey: process.env.GROQ_API_KEY
 });
 
 export async function generateSqlQuery(request: SqlQueryRequest): Promise<SqlQueryResponse> {
@@ -70,8 +69,8 @@ Respond with JSON in this exact format:
   "naturalLanguage": "This query retrieves..."
 }`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+    const response = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",
@@ -93,7 +92,17 @@ Respond with JSON in this exact format:
       naturalLanguage: result.naturalLanguage || "",
     };
   } catch (error) {
-    console.error("OpenAI API error:", error);
+    console.error("Groq API error:", error);
+    
+    // Check if it's an API key issue
+    if (error instanceof Error && error.message.includes("401")) {
+      return {
+        sql: "",
+        naturalLanguage: "",
+        error: "Groq API key not configured or invalid. Please set GROQ_API_KEY environment variable.",
+      };
+    }
+    
     return {
       sql: "",
       naturalLanguage: "",

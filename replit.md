@@ -39,7 +39,7 @@ The application manages a simple ERP-style database with four main entities:
 - Real-time query preview and validation
 
 ### AI-Powered Query Generation
-- OpenAI GPT-4o integration for natural language to SQL conversion
+- Groq Llama-3.3-70b integration for ultra-fast natural language to SQL conversion
 - Context-aware query suggestions based on database schema
 - Intelligent query optimization and validation
 
@@ -97,7 +97,7 @@ The application manages a simple ERP-style database with four main entities:
 
 ### Environment Configuration
 - **DATABASE_URL**: PostgreSQL connection string (required)
-- **OPENAI_API_KEY**: OpenAI API key for AI features (optional)
+- **GROQ_API_KEY**: Groq API key for AI-powered SQL generation (required)
 - **NODE_ENV**: Environment flag for development/production modes
 
 ## Recent Changes
@@ -112,6 +112,7 @@ The application manages a simple ERP-style database with four main entities:
   - Implemented tabbed interface for better organization
   - Added production-ready error handling and validation
   - Created dual interface: Basic Builder and Enhanced Builder
+  - **Switched from OpenAI to Groq API** for ultra-fast SQL generation using Llama-3.3-70b model
 
 ## Changelog
 
