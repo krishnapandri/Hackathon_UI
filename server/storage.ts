@@ -112,7 +112,12 @@ export class MemStorage implements IStorage {
 
   async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
     const id = this.currentCustomerId++;
-    const customer: Customer = { ...insertCustomer, id };
+    const customer: Customer = { 
+      ...insertCustomer, 
+      id,
+      phone: insertCustomer.phone ?? null,
+      address: insertCustomer.address ?? null
+    };
     this.customers.set(id, customer);
     return customer;
   }
@@ -127,7 +132,11 @@ export class MemStorage implements IStorage {
 
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
     const id = this.currentProductId++;
-    const product: Product = { ...insertProduct, id };
+    const product: Product = { 
+      ...insertProduct, 
+      id,
+      description: insertProduct.description ?? null
+    };
     this.products.set(id, product);
     return product;
   }
@@ -142,7 +151,12 @@ export class MemStorage implements IStorage {
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     const id = this.currentOrderId++;
-    const order: Order = { ...insertOrder, id };
+    const order: Order = { 
+      ...insertOrder, 
+      id,
+      customerId: insertOrder.customerId ?? null,
+      productId: insertOrder.productId ?? null
+    };
     this.orders.set(id, order);
     return order;
   }
@@ -157,7 +171,12 @@ export class MemStorage implements IStorage {
 
   async createSalesRep(insertSalesRep: InsertSalesRep): Promise<SalesRep> {
     const id = this.currentSalesRepId++;
-    const salesRep: SalesRep = { ...insertSalesRep, id };
+    const salesRep: SalesRep = { 
+      ...insertSalesRep, 
+      id,
+      territory: insertSalesRep.territory ?? null,
+      commission: insertSalesRep.commission ?? null
+    };
     this.salesReps.set(id, salesRep);
     return salesRep;
   }

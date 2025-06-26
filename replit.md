@@ -100,10 +100,23 @@ The application manages a simple ERP-style database with four main entities:
 - **OPENAI_API_KEY**: OpenAI API key for AI features (optional)
 - **NODE_ENV**: Environment flag for development/production modes
 
+## Recent Changes
+
+- **June 26, 2025**: Enhanced query builder with production features
+  - Added multi-column aggregation support (COUNT, SUM, AVG, MAX, MIN, COUNT_DISTINCT)
+  - Implemented advanced filtering with multiple operators (=, !=, >, <, LIKE, IN, BETWEEN, etc.)
+  - Added sorting capabilities with multiple columns
+  - Integrated query validation and execution plan analysis
+  - Enhanced export functionality (CSV, JSON formats)
+  - Added query template saving and management
+  - Implemented tabbed interface for better organization
+  - Added production-ready error handling and validation
+  - Created dual interface: Basic Builder and Enhanced Builder
+
 ## Changelog
 
 Changelog:
-- June 26, 2025. Initial setup
+- June 26, 2025. Initial setup and enhanced query builder implementation
 
 ## User Preferences
 
