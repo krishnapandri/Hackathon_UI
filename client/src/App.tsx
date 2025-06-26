@@ -35,7 +35,7 @@ function Navigation() {
               size="sm"
             >
               <Sparkles className="h-4 w-4 mr-2" />
-              Enhanced Builder
+              Advanced Builder
             </Button>
           </Link>
         </div>
