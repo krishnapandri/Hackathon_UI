@@ -2,18 +2,18 @@
 
 ## Overview
 
-This is a modern SQL query builder application built with React, TypeScript, and Node.js. The application provides a visual interface for constructing SQL queries through a drag-and-drop interface, with AI-powered natural language query generation capabilities. It features a clean, responsive design using shadcn/ui components and Tailwind CSS.
+This is a modern SQL query builder application built with Angular, TypeScript, and Node.js. The application provides a visual interface for constructing SQL queries through a drag-and-drop interface, with AI-powered natural language query generation capabilities. It features a clean, responsive design using Tailwind CSS and Angular's standalone components.
 
 ## System Architecture
 
 ### Frontend Architecture
-- **Framework**: React 18 with TypeScript
-- **Bundler**: Vite for fast development and optimized builds
-- **UI Library**: shadcn/ui components built on Radix UI primitives
-- **Styling**: Tailwind CSS with custom CSS variables for theming
-- **State Management**: React Query (TanStack Query) for server state management
-- **Routing**: Wouter for lightweight client-side routing
-- **Form Handling**: React Hook Form with Zod validation
+- **Framework**: Angular 19 with TypeScript
+- **Build System**: Angular CLI with Vite integration for fast development
+- **UI Styling**: Tailwind CSS with custom component styling
+- **State Management**: RxJS with Angular services for reactive state management
+- **Routing**: Angular Router for client-side navigation
+- **HTTP Client**: Angular HttpClient for API communication
+- **Form Handling**: Angular Reactive Forms with template-driven forms
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
@@ -113,6 +113,7 @@ The application manages a simple ERP-style database with four main entities:
   - Added production-ready error handling and validation
   - Created dual interface: Basic Builder and Enhanced Builder
   - **Switched from OpenAI to Groq API** for ultra-fast SQL generation using Llama-3.3-70b model
+  - **Converted entire project from React to Angular** - migrated to Angular 19 with standalone components, RxJS state management, and Angular Router
 
 ## Changelog
 
