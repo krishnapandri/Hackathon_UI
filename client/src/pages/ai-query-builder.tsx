@@ -300,6 +300,67 @@ export default function AIQueryBuilder() {
     setShowSuggestions(false);
   };
 
+  const handleTemplateClick = (template: QueryTemplate) => {
+    const templateQueries = getTemplateQueries(template.id);
+    if (templateQueries.length > 0) {
+      setPrompt(templateQueries[0]);
+      setShowSuggestions(false);
+      toast({
+        title: "Template Loaded",
+        description: `${template.name} query loaded`,
+      });
+    }
+  };
+
+  const getTemplateQueries = (templateId: string): string[] => {
+    switch (templateId) {
+      case '1': // Sales Performance Analysis
+        return [
+          "Show me the top 10 best-selling products by revenue",
+          "What are the monthly sales trends for the current year?",
+          "Which products have the highest profit margins?",
+          "Show sales performance by territory or region"
+        ];
+      case '2': // Customer Behavior Insights
+        return [
+          "Who are my top 20 customers by purchase value?",
+          "Show customer purchase frequency and patterns",
+          "Which customers haven't purchased in the last 90 days?",
+          "What is the customer lifetime value analysis?"
+        ];
+      case '3': // Inventory Management
+        return [
+          "Which products are running low on stock?",
+          "Show inventory turnover rates by product category",
+          "What are the slow-moving or dead stock items?",
+          "Show stock levels vs average sales velocity"
+        ];
+      case '4': // Territory Performance
+        return [
+          "Which sales representatives are meeting their targets?",
+          "Show territory-wise sales comparison",
+          "What is the commission analysis for sales reps?",
+          "Show sales performance by geographical area"
+        ];
+      case '5': // Financial Reporting
+        return [
+          "What is the revenue breakdown by product category?",
+          "Show profit and loss analysis by period",
+          "What are the payment terms and collection patterns?",
+          "Show cost analysis and margin trends"
+        ];
+      case '6': // Product Portfolio Analysis
+        return [
+          "Show seasonal sales patterns and trends",
+          "What are the key performance indicators (KPIs) dashboard?",
+          "Show product category performance comparison",
+          "What are the market basket analysis insights?"
+        ];
+      default:
+        return [];
+    }
+  };
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -382,33 +443,73 @@ export default function AIQueryBuilder() {
   };
 
   const queryTemplates: QueryTemplate[] = [
-    { id: '1', name: 'Sales Performance', description: 'Analyze top performing products and patterns', category: 'Analysis', icon: BarChart3 },
-    { id: '2', name: 'Customer Insights', description: 'Customer behavior and retention analysis', category: 'Analysis', icon: Users },
-    { id: '3', name: 'Product Reports', description: 'Product performance and inventory metrics', category: 'Reports', icon: ShoppingCart },
-    { id: '4', name: 'Territory Analysis', description: 'Territory sales and performance comparison', category: 'Analysis', icon: UserCheck },
-    { id: '5', name: 'Order Analysis', description: 'Order patterns and fulfillment metrics', category: 'Reports', icon: FileText },
-    { id: '6', name: 'Revenue Tracking', description: 'Revenue trends and growth metrics', category: 'Reports', icon: BarChart3 },
+    { id: '1', name: 'Sales Performance Analysis', description: 'Top performing products, sales trends, and growth metrics', category: 'Sales Analytics', icon: BarChart3 },
+    { id: '2', name: 'Customer Behavior Insights', description: 'Customer purchase patterns, loyalty, and segmentation', category: 'Customer Analytics', icon: Users },
+    { id: '3', name: 'Inventory Management', description: 'Stock levels, turnover rates, and reorder analysis', category: 'Inventory', icon: ShoppingCart },
+    { id: '4', name: 'Territory Performance', description: 'Regional sales comparison and territory optimization', category: 'Sales Analytics', icon: UserCheck },
+    { id: '5', name: 'Financial Reporting', description: 'Revenue tracking, profit margins, and financial KPIs', category: 'Financial', icon: FileText },
+    { id: '6', name: 'Product Portfolio Analysis', description: 'Product mix, pricing strategy, and category performance', category: 'Product Analytics', icon: BarChart3 },
   ];
 
   const suggestedQueries = [
     {
-      category: "What are the...",
+      category: "📊 Sales Performance",
       questions: [
-        "What are the total sales by region for each sales representative?",
-        "What are the top 5 products by total revenue?",
+        "Show me the top 10 best-selling products by revenue",
+        "What are the monthly sales trends for the current year?",
+        "Which products have the highest profit margins?",
+        "Show sales performance by territory or region",
+        "What are the average order values by customer segment?"
       ]
     },
     {
-      category: "Which products have...",
+      category: "👥 Customer Analytics",
       questions: [
-        "Which products have the highest average order value?",
-        "Which products have the lowest sales performance in the last quarter?",
+        "Who are my top 20 customers by purchase value?",
+        "Show customer purchase frequency and patterns",
+        "Which customers haven't purchased in the last 90 days?",
+        "What is the customer lifetime value analysis?",
+        "Show new vs returning customer analysis"
       ]
     },
     {
-      category: "Which sales territories...",
+      category: "📦 Inventory Management",
       questions: [
-        "Which sales territories have the lowest sales performance in the last quarter?",
+        "Which products are running low on stock?",
+        "Show inventory turnover rates by product category",
+        "What are the slow-moving or dead stock items?",
+        "Show stock levels vs average sales velocity",
+        "Which items need immediate reordering?"
+      ]
+    },
+    {
+      category: "💰 Financial Analysis",
+      questions: [
+        "What is the revenue breakdown by product category?",
+        "Show profit and loss analysis by period",
+        "What are the payment terms and collection patterns?",
+        "Show cost analysis and margin trends",
+        "What is the return on investment for different products?"
+      ]
+    },
+    {
+      category: "🎯 Territory & Sales Rep Performance",
+      questions: [
+        "Which sales representatives are meeting their targets?",
+        "Show territory-wise sales comparison",
+        "What is the commission analysis for sales reps?",
+        "Show sales performance by geographical area",
+        "Which territories have the highest growth potential?"
+      ]
+    },
+    {
+      category: "📈 Business Intelligence",
+      questions: [
+        "Show seasonal sales patterns and trends",
+        "What are the key performance indicators (KPIs) dashboard?",
+        "Show product category performance comparison",
+        "What are the market basket analysis insights?",
+        "Show business growth metrics and forecasting"
       ]
     }
   ];
@@ -483,12 +584,17 @@ export default function AIQueryBuilder() {
               {queryTemplates.map((template) => {
                 const IconComponent = template.icon;
                 return (
-                  <div key={template.id} className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer">
+                  <div 
+                    key={template.id} 
+                    className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => handleTemplateClick(template)}
+                  >
                     <div className="flex items-start">
                       <IconComponent className="h-4 w-4 mr-2 mt-0.5 text-primary" />
                       <div>
                         <div className="font-medium text-sm">{template.name}</div>
                         <div className="text-xs text-muted-foreground mt-1">{template.description}</div>
+                        <Badge variant="outline" className="text-xs mt-2">{template.category}</Badge>
                       </div>
                     </div>
                   </div>

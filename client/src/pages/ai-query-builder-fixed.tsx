@@ -323,10 +323,16 @@ export default function AIQueryBuilder() {
   };
 
   const handleTemplateClick = (template: QueryTemplate) => {
+    console.log('Template clicked:', template);
     const templateQueries = getTemplateQueries(template.id);
+    console.log('Template queries:', templateQueries);
     if (templateQueries.length > 0) {
       setPrompt(templateQueries[0]);
       setShowSuggestions(false);
+      toast({
+        title: "Template Loaded",
+        description: `${template.name} query loaded`,
+      });
     }
   };
 
