@@ -102,6 +102,14 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: Enhanced Query Builder Column Filtering Implementation
+  - **Successfully migrated from Replit Agent to standard Replit environment** - Completed migration with proper security and client/server separation
+  - **Added comprehensive column search functionality** - Search input field in Tables, Aggregations, and Group By sections
+  - **Implemented automatic TypeStatus column filtering** - All columns containing "typestatus" are automatically excluded from display
+  - **Removed datatype display from column names** - Clean column presentation without type information cluttering the interface
+  - **Enhanced user experience** - Streamlined column selection with instant search results across all query builder sections
+  - **Fixed all TypeScript compilation errors** - Proper error handling and type safety throughout the application
+
 - **June 27, 2025**: Complete Migration & Production Features Implementation
   - **Successfully migrated from Replit Agent to standard Replit environment** - Proper security and client/server separation
   - **Fixed column selection and TOP limit issues** - Enhanced Query Builder now respects user column selections
