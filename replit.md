@@ -102,6 +102,16 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: AI Query Builder Implementation
+  - **Added AI Query Builder** - Complete redesign based on screener.in reference interface
+  - Implemented comprehensive sidebar with Database Schema, Recent Queries, and Query Templates
+  - Added natural language query input with suggested queries
+  - Built production-ready interface with save/share functionality
+  - Integrated with existing Groq API for SQL generation
+  - Added proper error handling and loading states
+  - Implemented responsive design consistent with current theme
+  - **Migrated from Replit Agent to standard Replit environment** - ensured proper security and client/server separation
+
 - **June 26, 2025**: Enhanced query builder with production features
   - Added multi-column aggregation support (COUNT, SUM, AVG, MAX, MIN, COUNT_DISTINCT)
   - Implemented advanced filtering with multiple operators (=, !=, >, <, LIKE, IN, BETWEEN, etc.)

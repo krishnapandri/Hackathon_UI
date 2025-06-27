@@ -4,7 +4,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Play, Database, Sparkles } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { 
+  Loader2, 
+  Play, 
+  Database, 
+  Sparkles, 
+  History, 
+  BookOpen, 
+  ChevronRight,
+  Search,
+  Share,
+  Save,
+  X,
+  Table,
+  FileText,
+  BarChart3,
+  Users,
+  ShoppingCart,
+  UserCheck
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { SqlQueryRequest, SqlQueryResponse, QueryExecutionResult } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,11 +39,67 @@ interface TableMetadata {
   }>;
 }
 
+interface SavedQuery {
+  id: string;
+  name: string;
+  description: string;
+  lastUsed: string;
+}
+
+interface QueryTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  icon: any;
+}
+
 export default function AIQueryBuilder() {
   const [prompt, setPrompt] = useState("");
   const [generatedSql, setGeneratedSql] = useState("");
   const [queryResults, setQueryResults] = useState<QueryExecutionResult | null>(null);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const { toast } = useToast();
+
+  // Mock data for saved queries and templates
+  const savedQueries: SavedQuery[] = [
+    { id: '1', name: 'Product Performance', description: 'Analyze best performing products by sales', lastUsed: '1 day ago' },
+    { id: '2', name: 'Top Customer Analysis', description: 'Top customers with annual order values and frequency', lastUsed: '3 days ago' },
+    { id: '3', name: 'Monthly Sales Report', description: 'Monthly sales data categorized by current month', lastUsed: '1 week ago' },
+  ];
+
+  const queryTemplates: QueryTemplate[] = [
+    { id: '1', name: 'Sales Performance', description: 'Analyze top performing products and patterns', category: 'Analysis', icon: BarChart3 },
+    { id: '2', name: 'Customer Insights', description: 'Customer behavior and retention analysis', category: 'Analysis', icon: Users },
+    { id: '3', name: 'Product Reports', description: 'Product performance and inventory metrics', category: 'Reports', icon: ShoppingCart },
+    { id: '4', name: 'Territory Analysis', description: 'Territory sales and performance comparison', category: 'Analysis', icon: UserCheck },
+    { id: '5', name: 'Order Analysis', description: 'Order patterns and fulfillment metrics', category: 'Reports', icon: FileText },
+    { id: '6', name: 'Revenue Tracking', description: 'Revenue trends and growth metrics', category: 'Reports', icon: BarChart3 },
+  ];
+
+  const suggestedQueries = [
+    {
+      category: "What are the...",
+      questions: [
+        "What are the total sales by region for each sales representative?",
+        "What are the top 5 products by total revenue?",
+      ]
+    },
+    {
+      category: "Which products have...",
+      questions: [
+        "Which products have the highest average order value?",
+        "Which products have the lowest sales performance in the last quarter?",
+      ]
+    },
+    {
+      category: "Which sales territories...",
+      questions: [
+        "Which sales territories have the lowest sales performance in the last quarter?",
+      ]
+    }
+  ];
 
   // Fetch table metadata
   const { data: tableData, isLoading: isLoadingTables } = useQuery<{ tables: TableMetadata[] }>({
@@ -102,9 +179,10 @@ export default function AIQueryBuilder() {
       return;
     }
     generateSqlMutation.mutate(prompt);
+    setShowSuggestions(false);
   };
 
-  const handleExecuteQuery = () => {
+  const handleRunQuery = () => {
     if (!generatedSql.trim()) {
       toast({
         title: "No Query",
@@ -116,6 +194,19 @@ export default function AIQueryBuilder() {
     executeQueryMutation.mutate(generatedSql);
   };
 
+  const handleSuggestionClick = (suggestion: string) => {
+    setPrompt(suggestion);
+    setSelectedSuggestion(suggestion);
+  };
+
+  const handleClear = () => {
+    setPrompt("");
+    setGeneratedSql("");
+    setQueryResults(null);
+    setSelectedSuggestion(null);
+    setShowSuggestions(true);
+  };
+
   if (isLoadingTables) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -125,153 +216,277 @@ export default function AIQueryBuilder() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">AI Query Builder</h1>
-        <p className="text-muted-foreground">
-          Describe what you want to find in natural language, and AI will generate the SQL query for you.
-        </p>
-      </div>
-
-      {/* Available Tables */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Available Tables
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {tableData?.tables.map((table) => (
-              <div key={table.name} className="p-3 border rounded-lg">
-                <h4 className="font-medium capitalize mb-2">{table.name}</h4>
-                <p className="text-sm text-muted-foreground mb-2">
-                  {table.recordCount} records
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {table.columns.slice(0, 3).map((column) => (
-                    <Badge key={column.name} variant="secondary" className="text-xs">
-                      {column.name}
-                    </Badge>
-                  ))}
-                  {table.columns.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{table.columns.length - 3} more
-                    </Badge>
-                  )}
+    <div className="flex h-screen bg-background">
+      {/* Sidebar */}
+      <div className="w-80 bg-card border-r border-border flex flex-col">
+        {/* Database Schema Section */}
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Database className="h-4 w-4" />
+            <span className="font-medium text-sm">Database Schema</span>
+          </div>
+          <ScrollArea className="h-48">
+            <div className="space-y-2">
+              {tableData?.tables.map((table) => (
+                <div key={table.name} className="text-sm">
+                  <div className="flex items-center gap-2 py-1">
+                    <Table className="h-3 w-3 text-muted-foreground" />
+                    <span className="font-medium capitalize">{table.name}</span>
+                    <span className="text-xs text-muted-foreground">({table.recordCount})</span>
+                  </div>
+                  <div className="ml-5 space-y-1">
+                    {table.columns.slice(0, 4).map((column) => (
+                      <div key={column.name} className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span className="w-2 h-2 bg-muted-foreground/30 rounded-full"></span>
+                        {column.name}
+                      </div>
+                    ))}
+                    {table.columns.length > 4 && (
+                      <div className="text-xs text-muted-foreground ml-3">
+                        +{table.columns.length - 4} more columns
+                      </div>
+                    )}
+                  </div>
                 </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
+        <Separator />
+
+        {/* Recent Queries Section */}
+        <div className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <History className="h-4 w-4" />
+            <span className="font-medium text-sm">Recent Queries</span>
+          </div>
+          <div className="space-y-2">
+            {savedQueries.map((query) => (
+              <div key={query.id} className="p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                <div className="font-medium text-xs">{query.name}</div>
+                <div className="text-xs text-muted-foreground">{query.description}</div>
+                <div className="text-xs text-muted-foreground mt-1">{query.lastUsed}</div>
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* AI Query Input */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            Describe Your Query
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Textarea
-              placeholder="Example: Show me all customers from New York who placed orders worth more than $1000 in the last month"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="min-h-[100px] resize-none"
-            />
+          <div className="mt-3">
+            <Input placeholder="Search queries..." className="h-8 text-xs" />
           </div>
-          <Button 
-            onClick={handleGenerateSQL}
-            disabled={generateSqlMutation.isPending}
-            className="w-full"
-          >
-            {generateSqlMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating SQL...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate SQL Query
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Generated SQL */}
-      {generatedSql && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Generated SQL Query</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg font-mono text-sm overflow-x-auto">
-              <pre>{generatedSql}</pre>
+        <Separator />
+
+        {/* Query Templates Section */}
+        <div className="p-4 flex-1">
+          <div className="flex items-center gap-2 mb-3">
+            <BookOpen className="h-4 w-4" />
+            <span className="font-medium text-sm">Query Templates</span>
+          </div>
+          <ScrollArea className="h-64">
+            <div className="space-y-2">
+              {queryTemplates.map((template) => {
+                const IconComponent = template.icon;
+                return (
+                  <div key={template.id} className="p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <IconComponent className="h-3 w-3 text-muted-foreground" />
+                      <span className="font-medium text-xs">{template.name}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">{template.description}</div>
+                  </div>
+                );
+              })}
             </div>
-            <Button 
-              onClick={handleExecuteQuery}
-              disabled={executeQueryMutation.isPending}
-              className="w-full"
-            >
-              {executeQueryMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Executing...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Execute Query
-                </>
-              )}
+          </ScrollArea>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Natural Language Query</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Ask questions about your data in plain English
+              </p>
+            </div>
+            <Button variant="outline" size="sm">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Powered
             </Button>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </div>
 
-      {/* Query Results */}
-      {queryResults && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Query Results</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {queryResults.totalCount} results found in {queryResults.executionTime}ms
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-border">
-                <thead>
-                  <tr className="bg-muted">
-                    {queryResults.columns.map((column) => (
-                      <th key={column} className="border border-border p-2 text-left font-medium">
-                        {column}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {queryResults.rows.map((row, index) => (
-                    <tr key={index} className="hover:bg-muted/50">
-                      {queryResults.columns.map((column) => (
-                        <td key={column} className="border border-border p-2">
-                          {row[column]?.toString() || ''}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Query Input Area */}
+        <div className="flex-1 p-6">
+          <div className="max-w-4xl mx-auto">
+            {/* Input Section */}
+            <div className="mb-6">
+              <Textarea
+                placeholder="e.g., Show me customers who placed more than $1000 worth of products in the last 3 months..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="min-h-[120px] resize-none text-sm bg-muted/30 border-dashed"
+              />
+              <div className="flex items-center justify-between mt-3">
+                <div className="text-xs text-muted-foreground">
+                  {prompt.length}/1000
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleClear}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleGenerateSQL}
+                    disabled={generateSqlMutation.isPending}
+                  >
+                    {generateSqlMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Generate SQL
+                  </Button>
+                  {generatedSql && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleRunQuery}
+                      disabled={executeQueryMutation.isPending}
+                    >
+                      {executeQueryMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4 mr-2" />
+                      )}
+                      Run Query
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            {/* Suggested Queries */}
+            {showSuggestions && (
+              <Card className="mb-6">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Suggested Queries</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowSuggestions(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {suggestedQueries.map((group, groupIndex) => (
+                    <div key={groupIndex}>
+                      <h4 className="font-medium text-sm mb-2">{group.category}</h4>
+                      <div className="space-y-2">
+                        {group.questions.map((question, questionIndex) => (
+                          <Button
+                            key={questionIndex}
+                            variant="ghost"
+                            className="h-auto p-3 text-left justify-start text-wrap"
+                            onClick={() => handleSuggestionClick(question)}
+                          >
+                            <span className="text-sm">{question}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Generated SQL */}
+            {generatedSql && (
+              <Card className="mb-6">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Generated SQL Query</CardTitle>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm">
+                        <Save className="h-4 w-4 mr-1" />
+                        Save
+                      </Button>
+                      <Button variant="ghost" size="sm">
+                        <Share className="h-4 w-4 mr-1" />
+                        Share
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-muted/50 p-4 rounded-lg font-mono text-sm overflow-x-auto border">
+                    <pre className="whitespace-pre-wrap">{generatedSql}</pre>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Query Results */}
+            {queryResults && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Query Results</CardTitle>
+                    <div className="text-sm text-muted-foreground">
+                      {queryResults.totalCount} results • {queryResults.executionTime}ms
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            {queryResults.columns.map((column) => (
+                              <th key={column} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                {column}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {queryResults.rows.slice(0, 100).map((row, index) => (
+                            <tr key={index} className="hover:bg-muted/20">
+                              {queryResults.columns.map((column) => (
+                                <td key={column} className="px-4 py-3 text-sm whitespace-nowrap">
+                                  {row[column]?.toString() || ''}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {queryResults.rows.length > 100 && (
+                      <div className="p-4 bg-muted/30 text-center text-sm text-muted-foreground">
+                        Showing first 100 of {queryResults.totalCount} results
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
