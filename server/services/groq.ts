@@ -61,15 +61,19 @@ export async function generateSqlQuery(
         if (!agg.column || agg.column.trim() === "") {
           if (agg.function === "COUNT") {
             // For COUNT with no column, use COUNT(*)
-            const alias = agg.alias ? ` AS [${agg.alias}]` : "";
+            const alias = agg.alias ? ` AS [${agg.alias}]` : ` AS [${agg.function}_Total]`;
             columns.push(`COUNT(*)${alias}`);
           }
           // Skip other functions if no column is specified
           return;
         }
         
-        const alias = agg.alias ? ` AS [${agg.alias}]` : "";
-        columns.push(`${agg.function}([${agg.column}])${alias}`);
+        // Extract column name from table.column format
+        const columnName = agg.column.includes('.') ? agg.column.split('.').pop() : agg.column;
+        if (!columnName) return;
+        
+        const alias = agg.alias ? ` AS [${agg.alias}]` : ` AS [${agg.function}_${columnName}]`;
+        columns.push(`${agg.function}([${columnName}])${alias}`);
       });
     }
     
@@ -158,7 +162,11 @@ export async function generateSqlQuery(
     // Add custom filter conditions
     if (request.filterConditions && request.filterConditions.length > 0) {
       request.filterConditions.forEach(filter => {
-        let condition = `[${filter.column}] ${filter.operator}`;
+        // Extract column name from table.column format
+        const columnName = filter.column.includes('.') ? filter.column.split('.').pop() : filter.column;
+        if (!columnName) return;
+        
+        let condition = `[${columnName}] ${filter.operator}`;
         
         // Helper function to format value based on data type
         const formatValue = (value: any) => {
