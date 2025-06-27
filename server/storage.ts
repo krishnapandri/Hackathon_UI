@@ -266,4 +266,6 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { MSSQLStorage } from './mssql-storage';
+
+export const storage = new MSSQLStorage();
