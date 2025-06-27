@@ -76,16 +76,40 @@ export async function generateSqlQuery(
     // Add selected columns with proper table aliases
     if (request.selectedColumns && Object.keys(request.selectedColumns).length > 0) {
       Object.entries(request.selectedColumns).forEach(([tableName, tableColumns]) => {
-        const tableAlias = tableName.toLowerCase().substring(0, 2);
         tableColumns.forEach(column => {
           // Only add if not already in aggregation columns
           const isAggregated = request.aggregationColumns?.some(agg => 
             agg.column === `${tableName}.${column}` || agg.column === column
           );
           if (!isAggregated) {
-            columns.push(`[${column}]`); // Remove table alias for now since we're using single table
+            // Include all selected columns when GROUP BY is used
+            // (they will be automatically added to GROUP BY clause later)
+            columns.push(`[${column}]`);
           }
         });
+      });
+    }
+    
+    // Add sort columns to SELECT if they're not already included and we have GROUP BY
+    if (request.sortColumns && request.sortColumns.length > 0 && 
+        request.groupByColumns && request.groupByColumns.length > 0) {
+      request.sortColumns.forEach(sort => {
+        const columnName = sort.column.includes('.') ? sort.column.split('.').pop() : sort.column;
+        if (!columnName) return; // Skip if no column name
+        
+        const columnWithBrackets = `[${columnName}]`;
+        
+        // Check if column is already in SELECT
+        const isAlreadySelected = columns.some(col => 
+          col.includes(columnWithBrackets) || col.includes(columnName)
+        );
+        
+        // Check if it's an aggregate alias
+        const isAggregateAlias = request.aggregationColumns?.some(agg => agg.alias === columnName);
+        
+        if (!isAlreadySelected && !isAggregateAlias) {
+          columns.push(columnWithBrackets);
+        }
       });
     }
     
@@ -189,6 +213,45 @@ export async function generateSqlQuery(
         const columnName = col.includes('.') ? col.split('.').pop() : col;
         return `[${columnName}]`;
       });
+      
+      // When using GROUP BY with aggregations, add all selected columns to GROUP BY
+      // to avoid "column is invalid in select list" errors
+      if (request.aggregationColumns && request.aggregationColumns.length > 0 && 
+          request.selectedColumns && Object.keys(request.selectedColumns).length > 0) {
+        
+        // Get all selected columns that aren't already in GROUP BY
+        const allSelectedColumns = new Set<string>();
+        Object.entries(request.selectedColumns).forEach(([tableName, tableColumns]) => {
+          tableColumns.forEach(column => {
+            const cleanColumn = `[${column}]`;
+            if (!groupByColumns.includes(cleanColumn)) {
+              allSelectedColumns.add(cleanColumn);
+            }
+          });
+        });
+        
+        // Add selected columns to GROUP BY
+        groupByColumns.push(...Array.from(allSelectedColumns));
+      }
+      
+      // Also add sort columns to GROUP BY if they're not aggregates
+      if (request.sortColumns && request.sortColumns.length > 0) {
+        request.sortColumns.forEach(sort => {
+          const columnName = sort.column.includes('.') ? sort.column.split('.').pop() : sort.column;
+          if (!columnName) return; // Skip if no column name
+          
+          const cleanColumn = `[${columnName}]`;
+          
+          // Check if this column is already in GROUP BY or is an aggregate alias
+          const isAlreadyInGroupBy = groupByColumns.includes(cleanColumn);
+          const isAggregateAlias = request.aggregationColumns?.some(agg => agg.alias === columnName);
+          
+          if (!isAlreadyInGroupBy && !isAggregateAlias) {
+            groupByColumns.push(cleanColumn);
+          }
+        });
+      }
+      
       sqlQuery += `\nGROUP BY ${groupByColumns.join(", ")}`;
     }
     

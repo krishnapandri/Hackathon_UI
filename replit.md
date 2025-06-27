@@ -102,6 +102,14 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: GROUP BY and Aggregation Logic Fix
+  - **Fixed GROUP BY clause generation** - All selected columns are automatically included in GROUP BY when using aggregations
+  - **Fixed sort column handling** - Sort columns are automatically added to both SELECT and GROUP BY clauses to prevent "invalid in ORDER BY clause" errors
+  - **Enhanced aggregation and sorting compatibility** - Complex queries with COUNT, SUM, etc. now work properly with sorting
+  - **Maintained SQL Server compliance** - All generated queries follow proper GROUP BY rules for SQL Server views
+  - **Added comprehensive column validation** - System automatically includes all required columns in GROUP BY to prevent validation errors
+  - **Successful query execution** - Advanced Builder now generates clean, executable SQL for complex aggregation queries
+
 - **June 27, 2025**: Enhanced Query Builder SQL Generation Fix
   - **Fixed SQL generation routing issue** - Corrected logic that was incorrectly routing Enhanced Query Builder requests to AI query generation
   - **Removed problematic table aliases** - Eliminated table alias usage that was causing "multi-part identifier could not be bound" errors
