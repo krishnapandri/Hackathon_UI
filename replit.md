@@ -102,6 +102,14 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: Enhanced Query Builder SQL Generation Fix
+  - **Fixed SQL generation routing issue** - Corrected logic that was incorrectly routing Enhanced Query Builder requests to AI query generation
+  - **Removed problematic table aliases** - Eliminated table alias usage that was causing "multi-part identifier could not be bound" errors
+  - **Streamlined query validation** - Fixed fallback queries to work without table aliases
+  - **Enhanced column selection** - Query builder now properly respects user-selected columns instead of defaulting to SELECT *
+  - **Improved WHERE clause generation** - Proper business rule constraints applied without table prefix issues
+  - **Successful migration completion** - Enhanced Query Builder now generates clean, working SQL queries
+
 - **June 27, 2025**: AI Model Selection System Implementation
   - **Added comprehensive AI model selection** - Support for multiple free and paid AI providers
   - **Implemented Hugging Face integration** - Free models including Llama 2, Mistral 7B, DialoGPT

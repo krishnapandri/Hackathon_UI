@@ -18,9 +18,7 @@ export async function generateSqlQuery(
     
     // Check if this is an AI query (no selected tables/columns but has natural language)
     const isAIQuery = request.selectedTables.length === 0 && 
-                     Object.keys(request.selectedColumns).length === 0 && 
-                     request.naturalLanguageQuery && 
-                     request.naturalLanguageQuery.trim().length > 0;
+                     Object.keys(request.selectedColumns).length === 0;
     
     if (isAIQuery) {
       console.log("🤖 Routing to AI Query Generation");
@@ -72,7 +70,7 @@ export async function generateSqlQuery(
             agg.column === `${tableName}.${column}` || agg.column === column
           );
           if (!isAggregated) {
-            columns.push(`${tableAlias}.[${column}]`);
+            columns.push(`[${column}]`); // Remove table alias for now since we're using single table
           }
         });
       });
@@ -85,10 +83,9 @@ export async function generateSqlQuery(
     
     sqlQuery += columns.join(", ");
     
-    // FROM clause with table alias
+    // FROM clause without table alias for simplicity
     const mainTable = request.selectedTables[0];
-    const tableAlias = mainTable.toLowerCase().substring(0, 2);
-    sqlQuery += `\nFROM [${mainTable}] ${tableAlias}`;
+    sqlQuery += `\nFROM [${mainTable}]`;
     
     // Handle multiple tables with JOINs (simplified - inner join for now)
     if (request.selectedTables.length > 1) {
@@ -105,20 +102,19 @@ export async function generateSqlQuery(
     // Add table-specific mandatory conditions
     if (request.selectedTables.length > 0) {
       const mainTable = request.selectedTables[0];
-      const tableAlias = mainTable.toLowerCase().substring(0, 2);
       
       if (mainTable.toLowerCase() === 'sales') {
-        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
-        whereConditions.push(`${tableAlias}.SalesTypeStatus = 200`);
+        whereConditions.push(`CompanyTypeStatus IS NOT NULL`);
+        whereConditions.push(`SalesTypeStatus = 200`);
       } else if (mainTable.toLowerCase() === 'stock') {
-        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
-        whereConditions.push(`${tableAlias}.StockTypeStatus = 200`);
+        whereConditions.push(`CompanyTypeStatus IS NOT NULL`);
+        whereConditions.push(`StockTypeStatus = 200`);
       } else if (mainTable.toLowerCase() === 'salesreturn') {
-        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
-        whereConditions.push(`${tableAlias}.SalesReturnTypeStatus = 200`);
+        whereConditions.push(`CompanyTypeStatus IS NOT NULL`);
+        whereConditions.push(`SalesReturnTypeStatus = 200`);
       } else {
         // Generic fallback for other tables
-        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
+        whereConditions.push(`CompanyTypeStatus IS NOT NULL`);
       }
     }
     
@@ -408,23 +404,23 @@ export async function validateAndFixQuery(sqlQuery: string, request: SqlQueryReq
             // Build a simple SELECT * query with proper WHERE conditions
             if (mainTable.toLowerCase() === 'sales') {
               fixedQuery = `SELECT TOP 100 *
-FROM [${mainTable}] ${tableAlias}
-WHERE ${tableAlias}.SalesTypeStatus = 200
-ORDER BY ${tableAlias}.SalesDate DESC`;
+FROM [${mainTable}]
+WHERE SalesTypeStatus = 200
+ORDER BY SalesDate DESC`;
             } else if (mainTable.toLowerCase() === 'stock') {
               fixedQuery = `SELECT TOP 100 *
-FROM [${mainTable}] ${tableAlias}
-WHERE ${tableAlias}.StockTypeStatus = 200
-ORDER BY ${tableAlias}.ItemCode`;
+FROM [${mainTable}]
+WHERE StockTypeStatus = 200
+ORDER BY ItemCode`;
             } else if (mainTable.toLowerCase() === 'salesreturn') {
               fixedQuery = `SELECT TOP 100 *
-FROM [${mainTable}] ${tableAlias}
-WHERE ${tableAlias}.SalesReturnTypeStatus = 200
-ORDER BY ${tableAlias}.SalesReturnDate DESC`;
+FROM [${mainTable}]
+WHERE SalesReturnTypeStatus = 200
+ORDER BY SalesReturnDate DESC`;
             } else {
               // Generic fallback
               fixedQuery = `SELECT TOP 100 *
-FROM [${mainTable}] ${tableAlias}
+FROM [${mainTable}]
 ORDER BY 1`;
             }
           }
@@ -442,10 +438,9 @@ ORDER BY 1`;
         
         // Last resort: return a very basic working query
         const mainTable = request.selectedTables[0] || 'Sales';
-        const tableAlias = mainTable.toLowerCase().substring(0, 2);
         
         return `SELECT TOP 100 *
-FROM [${mainTable}] ${tableAlias}
+FROM [${mainTable}]
 ORDER BY 1`;
       }
     }
