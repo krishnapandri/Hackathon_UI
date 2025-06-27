@@ -102,6 +102,16 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: Rules Configuration System & MSSQL Integration
+  - **Added Rules Configuration tab** - Accessible via Alt+Z keyboard shortcut
+  - **Integrated Microsoft SQL Server database** - Connected to production database with connection string
+  - **Implemented business rules engine** - Customizable formulas and constraints for AI query generation
+  - **Added mandatory query conditions** - All queries include company_id and typestatus = 200 filters
+  - **Excluded _copy tables** - System automatically filters out backup/copy tables from schema
+  - **Enhanced AI context** - Groq AI now uses custom business rules and database-specific constraints
+  - **Added keyboard shortcuts** - Alt+Z opens Rules Configuration for quick access
+  - **Production-ready query generation** - Ensures all SQL follows business rules and security constraints
+
 - **June 27, 2025**: AI Query Builder Implementation
   - **Added AI Query Builder** - Complete redesign based on screener.in reference interface
   - Implemented comprehensive sidebar with Database Schema, Recent Queries, and Query Templates

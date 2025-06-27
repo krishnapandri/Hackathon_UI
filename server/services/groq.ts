@@ -11,6 +11,17 @@ export async function generateSqlQuery(request: SqlQueryRequest): Promise<SqlQue
     // Get actual database schema
     const tableMetadata = await storage.getTableMetadata();
     
+    // Get rules configuration from global storage
+    const rulesConfig = (global as any).rulesConfig || {
+      businessRules: [],
+      queryConfig: {
+        companyIdField: 'company_id',
+        typeStatusValue: 200,
+        excludeTablePatterns: ['_copy'],
+        defaultConditions: ['company_id IS NOT NULL', 'typestatus = 200']
+      }
+    };
+    
     // Build schema description
     let schemaDescription = "Database Schema (Microsoft SQL Server):\n";
     tableMetadata.tables.forEach(table => {
@@ -20,18 +31,33 @@ export async function generateSqlQuery(request: SqlQueryRequest): Promise<SqlQue
       });
     });
 
-    const businessRulesContext = `
+    // Build business rules context from configuration
+    let businessRulesContext = `
 Business Rules and Context:
-1. Sales Amount Ratio Formula: (Current Period Sales / Previous Period Sales) * 100
-2. Matrix Generation: Create 16x16 matrices for analytical purposes when requested
-3. Financial Calculations: Always handle NULL values appropriately using ISNULL() or COALESCE()
-4. Date Handling: Use SQL Server date functions (GETDATE(), DATEADD(), DATEDIFF(), etc.)
-5. Performance: Consider using appropriate indexes and limit result sets
-6. Aggregations: Use SUM(), AVG(), COUNT(), MIN(), MAX() for financial metrics
-7. String Operations: Use SQL Server string functions (CONCAT(), SUBSTRING(), LEN(), etc.)
-8. Conditional Logic: Use CASE WHEN statements for complex business logic
-9. Window Functions: Use ROW_NUMBER(), RANK(), PARTITION BY for analytical queries
-10. Data Types: Handle DECIMAL/NUMERIC for financial calculations properly
+`;
+    
+    rulesConfig.businessRules.forEach((rule: any, index: number) => {
+      if (rule.isActive) {
+        businessRulesContext += `${index + 1}. ${rule.name}: ${rule.description}\n   Formula: ${rule.formula}\n`;
+      }
+    });
+
+    businessRulesContext += `
+Additional Rules:
+- Financial Calculations: Always handle NULL values appropriately using ISNULL() or COALESCE()
+- Date Handling: Use SQL Server date functions (GETDATE(), DATEADD(), DATEDIFF(), etc.)
+- Performance: Consider using appropriate indexes and limit result sets
+- Aggregations: Use SUM(), AVG(), COUNT(), MIN(), MAX() for financial metrics
+- String Operations: Use SQL Server string functions (CONCAT(), SUBSTRING(), LEN(), etc.)
+- Conditional Logic: Use CASE WHEN statements for complex business logic
+- Window Functions: Use ROW_NUMBER(), RANK(), PARTITION BY for analytical queries
+- Data Types: Handle DECIMAL/NUMERIC for financial calculations properly
+
+Mandatory Query Constraints:
+- ALWAYS include WHERE clause with: ${rulesConfig.queryConfig.defaultConditions.join(' AND ')}
+- NEVER use tables matching patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(', ')}
+- Company ID field: ${rulesConfig.queryConfig.companyIdField}
+- Type Status value: ${rulesConfig.queryConfig.typeStatusValue}
 
 SQL Server Specific Syntax:
 - Use [square brackets] for table/column names with spaces or reserved words
@@ -48,8 +74,10 @@ ${schemaDescription}
 
 ${businessRulesContext}
 
-Rules:
+CRITICAL RULES - MUST BE FOLLOWED:
 - Generate only SELECT queries for data analysis
+- ALWAYS include WHERE clause with these mandatory conditions: ${rulesConfig.queryConfig.defaultConditions.join(' AND ')}
+- NEVER query tables containing patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(', ')}
 - Use proper SQL Server T-SQL syntax
 - Include appropriate JOINs when querying multiple tables
 - Handle date/time queries with SQL Server functions
@@ -58,9 +86,15 @@ Rules:
 - Use [square brackets] for table/column names when needed
 - Handle NULL values appropriately with ISNULL() or COALESCE()
 - For matrix queries, generate proper pivot/unpivot or case statements
-- Include proper WHERE clauses for filtering
 - Use ORDER BY for sorted results
 - Consider using window functions for analytical queries
+
+QUERY STRUCTURE TEMPLATE:
+SELECT TOP 100 [columns]
+FROM [table_name]
+WHERE ${rulesConfig.queryConfig.defaultConditions.join(' AND ')}
+  AND [additional_conditions]
+[ORDER BY clause]
 
 Return only valid T-SQL without explanations or markdown formatting.`;
 

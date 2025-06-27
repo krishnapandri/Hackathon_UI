@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Link, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -8,10 +9,24 @@ import NotFound from "@/pages/not-found";
 import QueryBuilder from "@/pages/query-builder";
 import EnhancedQueryBuilder from "@/pages/enhanced-query-builder";
 import AIQueryBuilder from "@/pages/ai-query-builder";
-import { Database, Sparkles, Bot } from "lucide-react";
+import RulesConfig from "@/pages/rules-config";
+import { Database, Sparkles, Bot, Settings } from "lucide-react";
 
 function Navigation() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  // Keyboard shortcut for Rules Configuration (Alt+Z)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey && event.key === 'z') {
+        event.preventDefault();
+        setLocation('/rules-config');
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [setLocation]);
   
   return (
     <nav className="bg-white border-b border-neutral-200 px-4 py-2">
@@ -48,6 +63,15 @@ function Navigation() {
               AI Query Builder
             </Button>
           </Link>
+          <Link href="/rules-config">
+            <Button 
+              variant={location === "/rules-config" ? "default" : "ghost"} 
+              size="sm"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Rules Config
+            </Button>
+          </Link>
         </div>
       </div>
     </nav>
@@ -62,6 +86,7 @@ function Router() {
         <Route path="/" component={QueryBuilder} />
         <Route path="/enhanced" component={EnhancedQueryBuilder} />
         <Route path="/ai-builder" component={AIQueryBuilder} />
+        <Route path="/rules-config" component={RulesConfig} />
         <Route component={NotFound} />
       </Switch>
     </>

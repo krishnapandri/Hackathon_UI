@@ -223,6 +223,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rules configuration endpoints
+  app.get("/api/rules-config", async (req, res) => {
+    try {
+      // For now, return default configuration
+      // In production, this would fetch from database
+      const config = {
+        businessRules: [
+          {
+            id: '1',
+            name: 'Sales Amount Ratio',
+            description: 'Calculate sales ratio between current and previous period',
+            formula: '(Current_Period_Sales / Previous_Period_Sales) * 100',
+            category: 'calculation',
+            isActive: true
+          },
+          {
+            id: '2',
+            name: 'Matrix Generation',
+            description: 'Generate 16x16 matrix for analytical purposes',
+            formula: 'CASE WHEN ROW_NUMBER() OVER() <= 16 AND column_index <= 16 THEN value END',
+            category: 'calculation',
+            isActive: true
+          }
+        ],
+        queryConfig: {
+          companyIdField: 'company_id',
+          typeStatusValue: 200,
+          excludeTablePatterns: ['_copy'],
+          defaultConditions: ['company_id IS NOT NULL', 'typestatus = 200']
+        }
+      };
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch rules configuration" });
+    }
+  });
+
+  app.post("/api/rules-config", async (req, res) => {
+    try {
+      const { businessRules, queryConfig } = req.body;
+      
+      // In production, save to database
+      // For now, just validate and return success
+      if (!businessRules || !queryConfig) {
+        return res.status(400).json({ error: "Invalid configuration data" });
+      }
+
+      // Store configuration globally for use in query generation
+      (global as any).rulesConfig = { businessRules, queryConfig };
+      
+      res.json({ success: true, message: "Configuration saved successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save rules configuration" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -103,7 +103,7 @@ export class MSSQLStorage implements IStorage {
       const pool = await this.getConnection();
       const request = pool.request();
 
-      // Get all tables with their column information
+      // Get all tables with their column information, excluding _copy tables
       const tableQuery = `
         SELECT 
           t.TABLE_NAME,
@@ -117,6 +117,9 @@ export class MSSQLStorage implements IStorage {
         LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_NAME = c.TABLE_NAME
         WHERE t.TABLE_TYPE = 'BASE TABLE'
         AND t.TABLE_SCHEMA = 'dbo'
+        AND t.TABLE_NAME NOT LIKE '%_copy%'
+        AND t.TABLE_NAME NOT LIKE '%_Copy%'
+        AND t.TABLE_NAME NOT LIKE '%_COPY%'
         ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION
       `;
 
