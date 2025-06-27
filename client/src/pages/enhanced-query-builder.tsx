@@ -171,6 +171,7 @@ export default function EnhancedQueryBuilder() {
     }
   }, [queryState]);
 
+  // Calculate available columns from selected tables
   const availableColumns = queryState.selectedTables.flatMap(tableName => {
     const table = tableData?.tables.find(t => t.name === tableName);
     return table?.columns.map(col => ({
@@ -409,6 +410,8 @@ export default function EnhancedQueryBuilder() {
       });
     }
   };
+
+
 
   return (
     <div className="min-h-screen bg-neutral-50">
