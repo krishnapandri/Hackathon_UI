@@ -39,7 +39,7 @@ function Navigation() {
             <Zap className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
               ERP Query Builder
             </h1>
             <p className="text-xs text-muted-foreground hidden sm:block">Advanced SQL Query Interface</p>
