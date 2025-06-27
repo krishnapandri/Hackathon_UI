@@ -8,15 +8,24 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
+// Enhanced Query Builder - Uses structured data (tables, columns, filters)
 export async function generateSqlQuery(
   request: SqlQueryRequest,
 ): Promise<SqlQueryResponse> {
   try {
     // Debug: Log the request to see what data is being sent from UI
-    console.log("🔍 Query Request:", JSON.stringify(request, null, 2));
+    console.log("🔍 Enhanced Query Request:", JSON.stringify(request, null, 2));
     
-    // Get actual database schema
-    const tableMetadata = await storage.getTableMetadata();
+    // Check if this is an AI query (no selected tables/columns but has natural language)
+    const isAIQuery = request.selectedTables.length === 0 && 
+                     Object.keys(request.selectedColumns).length === 0 && 
+                     request.naturalLanguageQuery && 
+                     request.naturalLanguageQuery.trim().length > 0;
+    
+    if (isAIQuery) {
+      console.log("🤖 Routing to AI Query Generation");
+      return await generateAISqlQuery(request);
+    }
 
     // Get rules configuration from global storage
     const rulesConfig = (global as any).rulesConfig || {
@@ -124,18 +133,155 @@ export async function generateSqlQuery(
     }
 
     // Debug: Log the generated SQL
-    console.log("🔍 Generated SQL:", sqlQuery);
+    console.log("🔍 Enhanced Generated SQL:", sqlQuery);
 
     return {
       sql: sqlQuery,
       naturalLanguage: request.naturalLanguageQuery,
     };
   } catch (error) {
-    console.error("SQL generation error:", error);
+    console.error("Enhanced SQL generation error:", error);
     return {
       sql: "",
       naturalLanguage: request.naturalLanguageQuery,
       error: "Failed to generate SQL query. Please check your configuration and try again.",
+    };
+  }
+}
+
+// AI Query Builder - Uses natural language processing with Groq AI
+export async function generateAISqlQuery(
+  request: SqlQueryRequest,
+): Promise<SqlQueryResponse> {
+  try {
+    console.log("🤖 AI Query Request:", request.naturalLanguageQuery);
+    
+    // Get actual database schema
+    const tableMetadata = await storage.getTableMetadata();
+
+    // Get rules configuration from global storage
+    const rulesConfig = (global as any).rulesConfig || {
+      businessRules: [],
+      queryConfig: {
+        companyIdField: "company_id",
+        typeStatusValue: 200,
+        excludeTablePatterns: ["_copy"],
+        defaultConditions: ["company_id IS NOT NULL", "typestatus = 200"],
+      },
+    };
+
+    // Build schema description for views
+    let schemaDescription = "Database Schema (Microsoft SQL Server Views):\n";
+    tableMetadata.tables.forEach((view) => {
+      schemaDescription += `\n- ${view.name} (View - query with WHERE 1=2 for structure):\n`;
+      view.columns.forEach((column) => {
+        schemaDescription += `  • ${column.name}: ${column.type}\n`;
+      });
+    });
+
+    // Build business rules context from configuration
+    let businessRulesContext = `
+Business Rules and Context:
+`;
+
+    rulesConfig.businessRules.forEach((rule: any, index: number) => {
+      if (rule.isActive) {
+        businessRulesContext += `${index + 1}. ${rule.name}: ${rule.description}\n   Formula: ${rule.formula}\n`;
+      }
+    });
+
+    businessRulesContext += `
+Additional Rules:
+- Financial Calculations: Always handle NULL values appropriately using ISNULL() or COALESCE()
+- Date Handling: Use SQL Server date functions (GETDATE(), DATEADD(), DATEDIFF(), etc.)
+- Performance: Consider using appropriate indexes and limit result sets
+- Aggregations: Use SUM(), AVG(), COUNT(), MIN(), MAX() for financial metrics
+- String Operations: Use SQL Server string functions (CONCAT(), SUBSTRING(), LEN(), etc.)
+- Conditional Logic: Use CASE WHEN statements for complex business logic
+- Window Functions: Use ROW_NUMBER(), RANK(), PARTITION BY for analytical queries
+- Data Types: Handle DECIMAL/NUMERIC for financial calculations properly
+
+Mandatory Query Constraints:
+- ALWAYS include WHERE clause with: ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
+- NEVER use tables matching patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(", ")}
+- Company ID field: ${rulesConfig.queryConfig.companyIdField}
+- Type Status value: ${rulesConfig.queryConfig.typeStatusValue}
+
+SQL Server Specific Syntax:
+- Use [square brackets] for table/column names with spaces or reserved words
+- Use TOP N instead of LIMIT N
+- Use ISNULL(column, default_value) for NULL handling
+- Use CONCAT() or + for string concatenation
+- Use CAST() or CONVERT() for data type conversions
+- Use appropriate SQL Server date formats and functions
+`;
+
+    const systemPrompt = `You are an expert Microsoft SQL Server query generator. Generate valid T-SQL queries based on natural language requests.
+
+${schemaDescription}
+
+${businessRulesContext}
+
+CRITICAL RULES - MUST BE FOLLOWED:
+- Generate only SELECT queries for data analysis
+- ALWAYS include WHERE clause with these mandatory conditions: ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
+- You are working with VIEWS, not tables - all schema objects are views
+- NEVER query views containing patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(", ")}
+- Use proper SQL Server T-SQL syntax for views
+- Include appropriate JOINs when querying multiple views
+- Handle date/time queries with SQL Server functions
+- Use aggregation functions when requested (SUM, AVG, COUNT, etc.)
+- Use [square brackets] for view/column names when needed
+- Handle NULL values appropriately with ISNULL() or COALESCE()
+- For matrix queries, generate proper pivot/unpivot or case statements
+- Use ORDER BY for sorted results
+- Consider using window functions for analytical queries
+- Only use TOP clause if specifically requested (avoid default TOP 100)
+
+QUERY STRUCTURE TEMPLATE:
+SELECT [columns]
+FROM [view_name]
+WHERE ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
+  AND [additional_conditions]
+[ORDER BY clause]
+
+Note: All database objects are views. When user asks for "table" data, query the corresponding view.
+
+Return only valid T-SQL without explanations or markdown formatting.`;
+
+    const userPrompt = `Generate SQL Server T-SQL query for: ${request.naturalLanguageQuery}`;
+
+    const completion = await groq.chat.completions.create({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.1,
+      max_tokens: 2000,
+    });
+
+    const sql = completion.choices[0]?.message?.content?.trim() || "";
+
+    // Clean up the SQL (remove any markdown formatting if present)
+    const cleanSql = sql
+      .replace(/```sql\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    console.log("🤖 AI Generated SQL:", cleanSql);
+
+    return {
+      sql: cleanSql,
+      naturalLanguage: request.naturalLanguageQuery,
+    };
+  } catch (error) {
+    console.error("Groq AI error:", error);
+    return {
+      sql: "",
+      naturalLanguage: request.naturalLanguageQuery,
+      error:
+        "Failed to generate SQL query using AI. Please check your API key and try again.",
     };
   }
 }
