@@ -102,6 +102,17 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: AI Query Error Handling and Mathematical Safety Implementation
+  - **Enhanced AI prompts with mathematical safety rules** - All AI providers now include comprehensive error handling instructions
+  - **Added divide by zero prevention** - NULLIF() and CASE WHEN statements automatically used for division operations
+  - **Implemented safe profit margin calculations** - Template includes proper error handling for financial calculations
+  - **Enhanced system prompts for all AI models** - Groq, Hugging Face, OpenRouter all include mathematical safety guidelines
+  - **Added specific profit margin template** - Local template generator includes safe profit margin calculation example
+  - **Comprehensive mathematical validation** - All division operations protected against zero denominators
+  - **Decimal precision handling** - Use 100.0 instead of 100 for percentage calculations to maintain precision
+  - **NULL value protection** - ISNULL() and COALESCE() functions used appropriately in calculations
+  - **TRY_CAST() usage guidance** - Safe type conversion instructions included in AI prompts
+
 - **June 27, 2025**: Comprehensive Query Validation System Implementation
   - **Added real-time query validation** - Comprehensive validation engine that checks query validity as users make selections
   - **Implemented auto-correction logic** - Automatic GROUP BY management when aggregations are added/removed
