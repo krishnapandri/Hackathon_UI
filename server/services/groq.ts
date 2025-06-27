@@ -12,6 +12,9 @@ export async function generateSqlQuery(
   request: SqlQueryRequest,
 ): Promise<SqlQueryResponse> {
   try {
+    // Debug: Log the request to see what data is being sent from UI
+    console.log("🔍 Query Request:", JSON.stringify(request, null, 2));
+    
     // Get actual database schema
     const tableMetadata = await storage.getTableMetadata();
 
@@ -119,6 +122,9 @@ export async function generateSqlQuery(
       const orderBy = request.sortColumns.map(sort => `[${sort.column}] ${sort.direction}`).join(", ");
       sqlQuery += `\nORDER BY ${orderBy}`;
     }
+
+    // Debug: Log the generated SQL
+    console.log("🔍 Generated SQL:", sqlQuery);
 
     return {
       sql: sqlQuery,
