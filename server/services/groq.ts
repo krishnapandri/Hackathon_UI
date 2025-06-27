@@ -44,9 +44,11 @@ export async function generateSqlQuery(
       sqlQuery += "DISTINCT ";
     }
     
-    // Handle TOP clause only if limit is specified
-    if (request.limit && request.limit > 0) {
-      sqlQuery += `TOP ${request.limit} `;
+    // Handle TOP clause - required if ORDER BY is present or if limit is specified
+    const needsTop = (request.sortColumns && request.sortColumns.length > 0) || (request.limit && request.limit > 0);
+    if (needsTop) {
+      const topValue = (request.limit && request.limit > 0) ? request.limit : 1000;
+      sqlQuery += `TOP ${topValue} `;
     }
     
     // Build column list
@@ -55,6 +57,17 @@ export async function generateSqlQuery(
     // Add aggregation columns
     if (request.aggregationColumns && request.aggregationColumns.length > 0) {
       request.aggregationColumns.forEach(agg => {
+        // Skip aggregation columns with empty column names
+        if (!agg.column || agg.column.trim() === "") {
+          if (agg.function === "COUNT") {
+            // For COUNT with no column, use COUNT(*)
+            const alias = agg.alias ? ` AS [${agg.alias}]` : "";
+            columns.push(`COUNT(*)${alias}`);
+          }
+          // Skip other functions if no column is specified
+          return;
+        }
+        
         const alias = agg.alias ? ` AS [${agg.alias}]` : "";
         columns.push(`${agg.function}([${agg.column}])${alias}`);
       });
@@ -171,12 +184,21 @@ export async function generateSqlQuery(
     
     // GROUP BY clause
     if (request.groupByColumns && request.groupByColumns.length > 0) {
-      sqlQuery += `\nGROUP BY ${request.groupByColumns.map(col => `[${col}]`).join(", ")}`;
+      const groupByColumns = request.groupByColumns.map(col => {
+        // Remove table prefix if present (e.g., "Sales.SalesBillNo" -> "SalesBillNo")
+        const columnName = col.includes('.') ? col.split('.').pop() : col;
+        return `[${columnName}]`;
+      });
+      sqlQuery += `\nGROUP BY ${groupByColumns.join(", ")}`;
     }
     
     // ORDER BY clause
     if (request.sortColumns && request.sortColumns.length > 0) {
-      const orderBy = request.sortColumns.map(sort => `[${sort.column}] ${sort.direction}`).join(", ");
+      const orderBy = request.sortColumns.map(sort => {
+        // Remove table prefix if present (e.g., "Sales.SalesBillQuantity" -> "SalesBillQuantity")
+        const columnName = sort.column.includes('.') ? sort.column.split('.').pop() : sort.column;
+        return `[${columnName}] ${sort.direction}`;
+      }).join(", ");
       sqlQuery += `\nORDER BY ${orderBy}`;
     }
 
