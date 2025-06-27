@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
@@ -21,7 +22,11 @@ import {
   Download,
   FileSpreadsheet,
   Settings,
-  HelpCircle 
+  HelpCircle,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  Filter
 } from "lucide-react";
 import type { QueryBuilderState, SqlQueryResponse, QueryExecutionResult } from "@shared/schema";
 
@@ -39,14 +44,23 @@ export default function QueryBuilder() {
   const [queryState, setQueryState] = useState<QueryBuilderState>({
     selectedTables: [],
     selectedColumns: {},
-    aggregationFunction: undefined,
-    targetColumn: undefined,
+    aggregationColumns: [],
     groupByColumns: [],
+    filterConditions: [],
+    sortColumns: [],
+    distinct: false,
   });
   
   const [generatedQuery, setGeneratedQuery] = useState<SqlQueryResponse | null>(null);
   const [queryResults, setQueryResults] = useState<QueryExecutionResult | null>(null);
   const [naturalLanguagePreview, setNaturalLanguagePreview] = useState<string>("");
+  
+  // Enhanced filtering and search states
+  const [columnSearch, setColumnSearch] = useState<string>("");
+  const [aggregationSearch, setAggregationSearch] = useState<string>("");
+  const [groupBySearch, setGroupBySearch] = useState<string>("");
+  const [showTypeStatusOnly, setShowTypeStatusOnly] = useState<boolean>(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Fetch table metadata
   const { data: tableData, isLoading: tablesLoading } = useQuery<{ tables: TableMetadata[] }>({
@@ -110,7 +124,7 @@ export default function QueryBuilder() {
     if (queryState.selectedTables.length > 0) {
       const tableNames = queryState.selectedTables.join(", ");
       const columnCount = Object.values(queryState.selectedColumns).flat().length;
-      const aggregation = queryState.aggregationFunction || "SELECT";
+      const aggregation = queryState.aggregationColumns.length > 0 ? "Aggregated" : "SELECT";
       const groupBy = queryState.groupByColumns.length > 0 ? ` grouped by ${queryState.groupByColumns.join(", ")}` : "";
       
       setNaturalLanguagePreview(
@@ -196,12 +210,19 @@ export default function QueryBuilder() {
     setQueryState({
       selectedTables: [],
       selectedColumns: {},
-      aggregationFunction: undefined,
-      targetColumn: undefined,
+      aggregationColumns: [],
       groupByColumns: [],
+      filterConditions: [],
+      sortColumns: [],
+      distinct: false,
     });
     setGeneratedQuery(null);
     setQueryResults(null);
+    setColumnSearch("");
+    setAggregationSearch("");
+    setGroupBySearch("");
+    setShowTypeStatusOnly(false);
+    setExpandedGroups({});
   };
 
   const copyToClipboard = async (text: string) => {
@@ -256,6 +277,68 @@ export default function QueryBuilder() {
     const table = tableData?.tables.find(t => t.name === tableName);
     return table?.columns.map(col => `${tableName}.${col.name}`) || [];
   });
+
+  // Helper functions for column grouping and filtering
+  const getColumnPrefix = (columnName: string): string => {
+    // Extract prefix before common suffixes or camelCase patterns
+    const patterns = [
+      /^([a-zA-Z]+)(qty|Qty|QTY)$/i,
+      /^([a-zA-Z]+)(amount|Amount|AMOUNT)$/i,
+      /^([a-zA-Z]+)(price|Price|PRICE)$/i,
+      /^([a-zA-Z]+)(date|Date|DATE)$/i,
+      /^([a-zA-Z]+)(id|Id|ID)$/i,
+      /^([a-zA-Z]+)(name|Name|NAME)$/i,
+      /^([a-zA-Z]+)([A-Z][a-z]+)$/,
+      /^([a-zA-Z]+)_/,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = columnName.match(pattern);
+      if (match) return match[1].toLowerCase();
+    }
+    
+    // Fallback: return first 3-4 characters or whole word if short
+    return columnName.length > 4 ? columnName.substring(0, 4).toLowerCase() : columnName.toLowerCase();
+  };
+
+  const groupColumnsByPrefix = (columns: Array<{name: string, type: string}>) => {
+    const groups: Record<string, Array<{name: string, type: string}>> = {};
+    const ungrouped: Array<{name: string, type: string}> = [];
+    
+    columns.forEach(column => {
+      const prefix = getColumnPrefix(column.name);
+      const matchingColumns = columns.filter(col => 
+        getColumnPrefix(col.name) === prefix && col.name !== column.name
+      );
+      
+      if (matchingColumns.length > 0) {
+        if (!groups[prefix]) {
+          groups[prefix] = [];
+        }
+        if (!groups[prefix].find(col => col.name === column.name)) {
+          groups[prefix].push(column);
+        }
+      } else {
+        ungrouped.push(column);
+      }
+    });
+    
+    return { groups, ungrouped };
+  };
+
+  const toggleGroupExpansion = (groupName: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupName]: !prev[groupName]
+    }));
+  };
+
+  const filterColumns = (columns: Array<{name: string, type: string}>, searchTerm: string, typeStatusOnly: boolean) => {
+    return columns.filter(col => 
+      col.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (!typeStatusOnly || col.name.toLowerCase().includes('typestatus'))
+    );
+  };
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -330,9 +413,31 @@ export default function QueryBuilder() {
                   <p className="text-sm text-neutral-600">Choose columns from selected tables</p>
                 </CardHeader>
                 <CardContent>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Search className="h-4 w-4 text-gray-500" />
+                    <Input
+                      placeholder="Search columns..."
+                      value={columnSearch}
+                      onChange={(e) => setColumnSearch(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTypeStatusOnly(!showTypeStatusOnly)}
+                      className={showTypeStatusOnly ? "bg-blue-100 border-blue-300" : ""}
+                    >
+                      <Filter className="h-4 w-4 mr-1" />
+                      TypeStatus
+                    </Button>
+                  </div>
+
                   {queryState.selectedTables.map((tableName) => {
                     const table = tableData?.tables.find(t => t.name === tableName);
                     if (!table) return null;
+
+                    const filteredColumns = filterColumns(table.columns, columnSearch, showTypeStatusOnly);
+                    const { groups, ungrouped } = groupColumnsByPrefix(filteredColumns);
 
                     return (
                       <div key={tableName} className="mb-6 last:mb-0">
@@ -340,19 +445,58 @@ export default function QueryBuilder() {
                           <TableIcon className="text-neutral-400 mr-2 text-xs" />
                           {tableName}
                         </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                          {table.columns.map((column) => (
-                            <label key={column.name} className="flex items-center text-sm">
-                              <Checkbox
-                                checked={(queryState.selectedColumns[tableName] || []).includes(column.name)}
-                                onCheckedChange={(checked) => handleColumnSelection(tableName, column.name, checked as boolean)}
-                                className="w-3 h-3"
-                              />
-                              <span className="ml-2 text-neutral-700">{column.name}</span>
-                              <span className="ml-1 text-xs text-neutral-400">({column.type})</span>
-                            </label>
-                          ))}
-                        </div>
+
+                        {/* Grouped columns with expand/collapse */}
+                        {Object.entries(groups).map(([groupName, groupColumns]) => (
+                          <div key={groupName} className="mb-4">
+                            <div 
+                              className="flex items-center cursor-pointer mb-2 p-2 bg-gray-50 rounded hover:bg-gray-100"
+                              onClick={() => toggleGroupExpansion(`${tableName}-${groupName}`)}
+                            >
+                              {expandedGroups[`${tableName}-${groupName}`] ? (
+                                <ChevronDown className="h-4 w-4 text-gray-500 mr-2" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-gray-500 mr-2" />
+                              )}
+                              <span className="text-sm font-medium text-gray-700 capitalize">
+                                {groupName} ({groupColumns.length})
+                              </span>
+                            </div>
+                            
+                            {expandedGroups[`${tableName}-${groupName}`] && (
+                              <div className="ml-6 grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {groupColumns.map((column) => (
+                                  <label key={column.name} className="flex items-center text-sm">
+                                    <Checkbox
+                                      checked={(queryState.selectedColumns[tableName] || []).includes(column.name)}
+                                      onCheckedChange={(checked) => handleColumnSelection(tableName, column.name, checked as boolean)}
+                                      className="w-3 h-3"
+                                    />
+                                    <span className="ml-2 text-neutral-700">{column.name}</span>
+                                    <span className="ml-1 text-xs text-neutral-400">({column.type})</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Ungrouped columns */}
+                        {ungrouped.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {ungrouped.map((column) => (
+                              <label key={column.name} className="flex items-center text-sm">
+                                <Checkbox
+                                  checked={(queryState.selectedColumns[tableName] || []).includes(column.name)}
+                                  onCheckedChange={(checked) => handleColumnSelection(tableName, column.name, checked as boolean)}
+                                  className="w-3 h-3"
+                                />
+                                <span className="ml-2 text-neutral-700">{column.name}</span>
+                                <span className="ml-1 text-xs text-neutral-400">({column.type})</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -370,48 +514,114 @@ export default function QueryBuilder() {
                 <p className="text-sm text-neutral-600">Apply mathematical operations to your data</p>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-2">Primary Function</label>
-                    <Select
-                      value={queryState.aggregationFunction || ""}
-                      onValueChange={(value) => setQueryState(prev => ({ ...prev, aggregationFunction: value }))}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Search className="h-4 w-4 text-gray-500" />
+                    <Input
+                      placeholder="Search aggregation columns..."
+                      value={aggregationSearch}
+                      onChange={(e) => setAggregationSearch(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowTypeStatusOnly(!showTypeStatusOnly)}
+                      className={showTypeStatusOnly ? "bg-blue-100 border-blue-300" : ""}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select function..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="SELECT">SELECT</SelectItem>
-                        <SelectItem value="COUNT">COUNT</SelectItem>
-                        <SelectItem value="SUM">SUM</SelectItem>
-                        <SelectItem value="AVG">AVG</SelectItem>
-                        <SelectItem value="MAX">MAX</SelectItem>
-                        <SelectItem value="MIN">MIN</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Filter className="h-4 w-4 mr-1" />
+                      TypeStatus
+                    </Button>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-2">Target Column</label>
-                    <Select
-                      value={queryState.targetColumn || ""}
-                      onValueChange={(value) => setQueryState(prev => ({ ...prev, targetColumn: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select column..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableColumns.map((column) => (
-                          <SelectItem key={column} value={column}>{column}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+
+                  {queryState.aggregationColumns.map((agg, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 border rounded">
+                      <Select
+                        value={agg.function}
+                        onValueChange={(value) => {
+                          const newAggregations = [...queryState.aggregationColumns];
+                          newAggregations[index] = { ...agg, function: value as any };
+                          setQueryState(prev => ({ ...prev, aggregationColumns: newAggregations }));
+                        }}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="COUNT">COUNT</SelectItem>
+                          <SelectItem value="SUM">SUM</SelectItem>
+                          <SelectItem value="AVG">AVG</SelectItem>
+                          <SelectItem value="MAX">MAX</SelectItem>
+                          <SelectItem value="MIN">MIN</SelectItem>
+                          <SelectItem value="COUNT_DISTINCT">COUNT DISTINCT</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      <Select
+                        value={agg.column}
+                        onValueChange={(value) => {
+                          const newAggregations = [...queryState.aggregationColumns];
+                          newAggregations[index] = { ...agg, column: value };
+                          setQueryState(prev => ({ ...prev, aggregationColumns: newAggregations }));
+                        }}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select column..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableColumns
+                            .filter(col => 
+                              col.toLowerCase().includes(aggregationSearch.toLowerCase()) &&
+                              (!showTypeStatusOnly || col.toLowerCase().includes('typestatus'))
+                            )
+                            .map((column) => (
+                            <SelectItem key={column} value={column}>{column}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newAggregations = queryState.aggregationColumns.filter((_, i) => i !== index);
+                          setQueryState(prev => ({ ...prev, aggregationColumns: newAggregations }));
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const newAggregation = { function: "COUNT" as any, column: "", alias: "" };
+                      setQueryState(prev => ({ ...prev, aggregationColumns: [...prev.aggregationColumns, newAggregation] }));
+                    }}
+                  >
+                    + Add Aggregation
+                  </Button>
                 </div>
 
                 <div className="mt-6">
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">Group By</label>
+                  <div className="flex items-center gap-2 mb-4">
+                    <label className="block text-sm font-medium text-neutral-700">Group By</label>
+                    <Search className="h-4 w-4 text-gray-500" />
+                    <Input
+                      placeholder="Search group by columns..."
+                      value={groupBySearch}
+                      onChange={(e) => setGroupBySearch(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-2">
-                    {availableColumns.map((column) => (
+                    {availableColumns
+                      .filter(col => 
+                        col.toLowerCase().includes(groupBySearch.toLowerCase()) &&
+                        (!showTypeStatusOnly || col.toLowerCase().includes('typestatus'))
+                      )
+                      .map((column) => (
                       <Badge
                         key={column}
                         variant={queryState.groupByColumns.includes(column) ? "default" : "outline"}
