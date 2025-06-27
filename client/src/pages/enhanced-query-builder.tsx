@@ -30,7 +30,8 @@ import {
   Trash2,
   Settings2,
   ArrowUpDown,
-  Eye
+  Eye,
+  Sparkles
 } from "lucide-react";
 import type { 
   QueryBuilderState, 
@@ -465,14 +466,19 @@ export default function EnhancedQueryBuilder() {
 
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
-              <Database className="text-primary text-xl" />
-              <h1 className="text-xl font-semibold text-neutral-800">Enhanced Query Builder</h1>
+              <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
+                <Database className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Enhanced Query Builder</h1>
+                <p className="text-muted-foreground">Build complex SQL queries with advanced visual tools</p>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
               <Button 
@@ -486,17 +492,18 @@ export default function EnhancedQueryBuilder() {
             </div>
           </div>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Natural Language Preview */}
         {showPreview && (
-          <Card className="mb-6 bg-blue-50 border-blue-200">
+          <Card className="mb-6 bg-primary/5 border-primary/20 dark:bg-primary/10">
             <CardHeader>
-              <CardTitle className="text-blue-800 text-sm">Query Preview</CardTitle>
+              <CardTitle className="text-primary text-sm flex items-center">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Query Preview
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-blue-800 text-sm">{naturalLanguagePreview}</p>
+              <p className="text-primary/80 text-sm">{naturalLanguagePreview}</p>
             </CardContent>
           </Card>
         )}
