@@ -102,6 +102,15 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: AI Model Selection System Implementation
+  - **Added comprehensive AI model selection** - Support for multiple free and paid AI providers
+  - **Implemented Hugging Face integration** - Free models including Llama 2, Mistral 7B, DialoGPT
+  - **Added OpenRouter support** - Free tier models including Phi-3, Llama 3.2, Qwen 2
+  - **Created Local Template Generator** - Completely free, no API key required option
+  - **Built smart fallback system** - Automatic fallback to local generator if model fails
+  - **Enhanced UI with model selector** - Dropdown showing model availability and free/paid status
+  - **Maintained backward compatibility** - Existing Groq integration continues to work
+
 - **June 27, 2025**: Successful Migration from Replit Agent to Standard Replit Environment
   - **Completed full migration to standard Replit environment** - All dependencies properly installed and configured
   - **Fixed AI query generation with proper table prefixes** - Resolved "Invalid column name" errors by using correct column names (CompanyTypeStatus, SalesTypeStatus, etc.)

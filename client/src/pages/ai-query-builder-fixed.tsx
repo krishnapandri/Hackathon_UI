@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -73,6 +74,18 @@ interface QueryTemplate {
   icon: any;
 }
 
+interface AIModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+  contextLength: number;
+  free: boolean;
+  requiresKey: boolean;
+  keyName?: string;
+  available: boolean;
+}
+
 export default function AIQueryBuilder() {
   const [prompt, setPrompt] = useState("");
   const [generatedSql, setGeneratedSql] = useState("");
@@ -82,6 +95,7 @@ export default function AIQueryBuilder() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [saveQueryName, setSaveQueryName] = useState("");
   const [saveQueryDescription, setSaveQueryDescription] = useState("");
+  const [selectedModel, setSelectedModel] = useState("llama-3.3-70b-versatile");
   const { toast } = useToast();
 
   // API queries for fetching data
@@ -97,10 +111,18 @@ export default function AIQueryBuilder() {
     queryKey: ["/api/tables"],
   });
 
+  const { data: aiModelsData } = useQuery<{ models: AIModel[] }>({
+    queryKey: ["/api/ai-models"],
+  });
+
   // API mutations for actions
   const generateQueryMutation = useMutation({
     mutationFn: async (request: SqlQueryRequest) => {
-      const response = await apiRequest("POST", "/api/generate-sql", request);
+      const requestWithModel = {
+        modelId: selectedModel,
+        ...request
+      };
+      const response = await apiRequest("POST", "/api/generate-sql-with-model", requestWithModel);
       return response.json();
     },
     onSuccess: (data: SqlQueryResponse) => {
@@ -550,6 +572,37 @@ export default function AIQueryBuilder() {
                     <Sparkles className="h-4 w-4 mr-2" />
                     Generate Query
                   </Button>
+                </div>
+              </div>
+              
+              {/* AI Model Selection */}
+              <div className="mt-4 p-3 bg-muted/30 rounded-lg border-dashed border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="model-select" className="text-sm font-medium">AI Model</Label>
+                    <p className="text-xs text-muted-foreground mt-1">Choose which AI model to generate your SQL query</p>
+                  </div>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger className="w-64">
+                      <SelectValue placeholder="Select AI model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {aiModelsData?.models.map((model) => (
+                        <SelectItem key={model.id} value={model.id} disabled={!model.available}>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex flex-col">
+                              <span className="font-medium">{model.name}</span>
+                              <span className="text-xs text-muted-foreground">{model.provider}</span>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                              {model.free && <Badge variant="secondary" className="text-xs">Free</Badge>}
+                              {!model.available && <Badge variant="destructive" className="text-xs">API Key Required</Badge>}
+                            </div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateSqlQuery } from "./services/groq";
+import { getAvailableModels, generateQueryWithModel, FREE_AI_MODELS } from "./services/ai-providers";
 import { sqlQueryRequest } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -26,6 +27,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({ error: "Invalid request format" });
       } else {
         res.status(500).json({ error: "Failed to generate SQL query" });
+      }
+    }
+  });
+
+  // Get available AI models
+  app.get("/api/ai-models", async (req, res) => {
+    try {
+      const availableModels = getAvailableModels();
+      const allModels = FREE_AI_MODELS.map(model => ({
+        ...model,
+        available: availableModels.some(available => available.id === model.id)
+      }));
+      res.json({ models: allModels });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch AI models" });
+    }
+  });
+
+  // Generate SQL query with specific AI model
+  app.post("/api/generate-sql-with-model", async (req, res) => {
+    try {
+      const { modelId, ...queryRequest } = req.body;
+      const validatedRequest = sqlQueryRequest.parse(queryRequest);
+      const result = await generateQueryWithModel(validatedRequest, modelId);
+      res.json(result);
+    } catch (error) {
+      console.error("AI Model generation error:", error);
+      if (error instanceof Error && error.name === "ZodError") {
+        res.status(400).json({ error: "Invalid request format" });
+      } else {
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate SQL query" });
       }
     }
   });
