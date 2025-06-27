@@ -102,6 +102,17 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
+- **June 27, 2025**: Comprehensive Query Validation System Implementation
+  - **Added real-time query validation** - Comprehensive validation engine that checks query validity as users make selections
+  - **Implemented auto-correction logic** - Automatic GROUP BY management when aggregations are added/removed
+  - **Enhanced table/column selection** - Smart cleanup of related states when tables or columns are deselected
+  - **Added validation UI feedback** - Visual indicators showing validation errors and valid query status
+  - **Disabled invalid query generation** - Generate Query button disabled until all validation issues are resolved
+  - **Auto-GROUP BY for aggregations** - Selected columns automatically added to GROUP BY when using aggregations
+  - **Smart sort column handling** - Sort columns automatically added to GROUP BY when aggregations are present
+  - **Toast notifications for auto-corrections** - User feedback when system automatically fixes query structure
+  - **Comprehensive error messaging** - Detailed validation messages explaining exactly what needs to be fixed
+
 - **June 27, 2025**: GROUP BY and Aggregation Logic Fix
   - **Fixed GROUP BY clause generation** - All selected columns are automatically included in GROUP BY when using aggregations
   - **Fixed sort column handling** - Sort columns are automatically added to both SELECT and GROUP BY clauses to prevent "invalid in ORDER BY clause" errors

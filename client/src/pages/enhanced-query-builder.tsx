@@ -73,6 +73,10 @@ export default function EnhancedQueryBuilder() {
   const [columnSearch, setColumnSearch] = useState<string>("");
   const [aggregationSearch, setAggregationSearch] = useState<string>("");
   const [groupBySearch, setGroupBySearch] = useState<string>("");
+  
+  // Validation states
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isQueryValid, setIsQueryValid] = useState<boolean>(true);
 
   // Fetch table metadata
   const { data: tableData, isLoading: tablesLoading } = useQuery<{ tables: TableMetadata[] }>({
@@ -131,6 +135,110 @@ export default function EnhancedQueryBuilder() {
     },
   });
 
+  // Comprehensive query validation
+  const validateQuery = (state: QueryBuilderState): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    // Basic validation
+    if (state.selectedTables.length === 0) {
+      errors.push("At least one table must be selected");
+    }
+    
+    // Column selection validation
+    const totalSelectedColumns = Object.values(state.selectedColumns).flat().length;
+    if (totalSelectedColumns === 0 && state.aggregationColumns.length === 0) {
+      errors.push("At least one column or aggregation must be selected");
+    }
+    
+    // Aggregation validation
+    if (state.aggregationColumns.length > 0) {
+      for (let i = 0; i < state.aggregationColumns.length; i++) {
+        const agg = state.aggregationColumns[i];
+        if (!agg.column) {
+          errors.push(`Aggregation ${i + 1} must have a column selected`);
+        }
+        if (!agg.function) {
+          errors.push(`Aggregation ${i + 1} must have a function selected`);
+        }
+      }
+      
+      // When using aggregations, all non-aggregated selected columns must be in GROUP BY
+      const allSelectedColumns = Object.entries(state.selectedColumns).flatMap(([table, columns]) =>
+        columns.map(col => `${table}.${col}`)
+      );
+      
+      const missingFromGroupBy = allSelectedColumns.filter(col => !state.groupByColumns.includes(col));
+      if (missingFromGroupBy.length > 0) {
+        errors.push(`When using aggregations, all selected columns must be grouped: ${missingFromGroupBy.join(', ')}`);
+      }
+    }
+    
+    // Filter validation
+    for (let i = 0; i < state.filterConditions.length; i++) {
+      const filter = state.filterConditions[i];
+      if (!filter.column) {
+        errors.push(`Filter condition ${i + 1} must have a column selected`);
+      }
+      if (!filter.operator) {
+        errors.push(`Filter condition ${i + 1} must have an operator selected`);
+      }
+      
+      // Value validation based on operator
+      if (filter.operator === 'IS NULL' || filter.operator === 'IS NOT NULL') {
+        // These operators don't need values
+      } else if (filter.operator === 'BETWEEN') {
+        if (!filter.value || !filter.value2) {
+          errors.push(`Filter condition ${i + 1} with BETWEEN operator needs both values`);
+        }
+      } else if (filter.operator === 'IN' || filter.operator === 'NOT IN') {
+        if (!filter.value || (Array.isArray(filter.value) && filter.value.length === 0)) {
+          errors.push(`Filter condition ${i + 1} with ${filter.operator} operator needs at least one value`);
+        }
+      } else {
+        if (filter.value === undefined || filter.value === null || filter.value === '') {
+          errors.push(`Filter condition ${i + 1} must have a value`);
+        }
+      }
+    }
+    
+    // Sort validation
+    for (let i = 0; i < state.sortColumns.length; i++) {
+      const sort = state.sortColumns[i];
+      if (!sort.column) {
+        errors.push(`Sort column ${i + 1} must have a column selected`);
+      }
+      if (!sort.direction) {
+        errors.push(`Sort column ${i + 1} must have a direction selected`);
+      }
+      
+      // If using aggregations, sort columns must be either aggregated or in GROUP BY
+      if (state.aggregationColumns.length > 0) {
+        const isAggregated = state.aggregationColumns.some(agg => agg.column === sort.column);
+        const isInGroupBy = state.groupByColumns.includes(sort.column);
+        if (!isAggregated && !isInGroupBy) {
+          errors.push(`Sort column ${sort.column} must be either aggregated or in GROUP BY when using aggregations`);
+        }
+      }
+    }
+    
+    // Limit validation
+    if (state.limit !== undefined && (state.limit <= 0 || !Number.isInteger(state.limit))) {
+      errors.push("Limit must be a positive integer");
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
+  // Update validation whenever query state changes
+  useEffect(() => {
+    const validation = validateQuery(queryState);
+    setIsQueryValid(validation.isValid);
+    setValidationErrors(validation.errors);
+  }, [queryState]);
+
   // Update natural language preview
   useEffect(() => {
     if (queryState.selectedTables.length > 0) {
@@ -180,14 +288,40 @@ export default function EnhancedQueryBuilder() {
 
 
   const addAggregationColumn = () => {
-    setQueryState(prev => ({
-      ...prev,
-      aggregationColumns: [...prev.aggregationColumns, {
+    setQueryState(prev => {
+      const newAggregationColumns = [...prev.aggregationColumns, {
         column: "",
         function: "COUNT" as const,
         alias: ""
-      }]
-    }));
+      }];
+      
+      // When adding first aggregation, automatically add all selected columns to GROUP BY
+      let newGroupByColumns = [...prev.groupByColumns];
+      if (prev.aggregationColumns.length === 0) {
+        const allSelectedColumns = Object.entries(prev.selectedColumns).flatMap(([table, columns]) =>
+          columns.map(col => `${table}.${col}`)
+        );
+        
+        allSelectedColumns.forEach(fullCol => {
+          if (!newGroupByColumns.includes(fullCol)) {
+            newGroupByColumns.push(fullCol);
+          }
+        });
+        
+        if (allSelectedColumns.length > 0) {
+          toast({
+            title: "Auto-updated GROUP BY",
+            description: "Selected columns were automatically added to GROUP BY for aggregation query",
+          });
+        }
+      }
+      
+      return {
+        ...prev,
+        aggregationColumns: newAggregationColumns,
+        groupByColumns: newGroupByColumns,
+      };
+    });
   };
 
   const updateAggregationColumn = (index: number, field: keyof AggregationColumn, value: string) => {
@@ -200,10 +334,26 @@ export default function EnhancedQueryBuilder() {
   };
 
   const removeAggregationColumn = (index: number) => {
-    setQueryState(prev => ({
-      ...prev,
-      aggregationColumns: prev.aggregationColumns.filter((_, i) => i !== index)
-    }));
+    setQueryState(prev => {
+      const newAggregationColumns = prev.aggregationColumns.filter((_, i) => i !== index);
+      
+      // When removing the last aggregation, clear GROUP BY constraints
+      let newGroupByColumns = [...prev.groupByColumns];
+      if (newAggregationColumns.length === 0) {
+        // Clear GROUP BY when no aggregations remain
+        newGroupByColumns = [];
+        toast({
+          title: "GROUP BY cleared",
+          description: "GROUP BY was cleared since no aggregations remain",
+        });
+      }
+      
+      return {
+        ...prev,
+        aggregationColumns: newAggregationColumns,
+        groupByColumns: newGroupByColumns,
+      };
+    });
   };
 
   const addFilterCondition = () => {
@@ -273,12 +423,31 @@ export default function EnhancedQueryBuilder() {
   };
 
   const updateSortColumn = (index: number, field: keyof SortColumn, value: string) => {
-    setQueryState(prev => ({
-      ...prev,
-      sortColumns: prev.sortColumns.map((sort, i) => 
+    setQueryState(prev => {
+      const newSortColumns = prev.sortColumns.map((sort, i) => 
         i === index ? { ...sort, [field]: value } : sort
-      )
-    }));
+      );
+      
+      let newGroupByColumns = [...prev.groupByColumns];
+      
+      // If updating column and aggregations exist, ensure sort column is in GROUP BY
+      if (field === 'column' && value && prev.aggregationColumns.length > 0) {
+        const isAggregated = prev.aggregationColumns.some(agg => agg.column === value);
+        if (!isAggregated && !newGroupByColumns.includes(value)) {
+          newGroupByColumns.push(value);
+          toast({
+            title: "Auto-added to GROUP BY",
+            description: `${value} was automatically added to GROUP BY for sorting with aggregations`,
+          });
+        }
+      }
+      
+      return {
+        ...prev,
+        sortColumns: newSortColumns,
+        groupByColumns: newGroupByColumns,
+      };
+    });
   };
 
   const removeSortColumn = (index: number) => {
@@ -314,24 +483,84 @@ export default function EnhancedQueryBuilder() {
         delete newSelectedColumns[tableName];
       }
       
+      // Clean up related states when table is deselected
+      let newAggregationColumns = prev.aggregationColumns;
+      let newGroupByColumns = prev.groupByColumns;
+      let newFilterConditions = prev.filterConditions;
+      let newSortColumns = prev.sortColumns;
+      
+      if (!checked) {
+        // Remove aggregations that reference the deselected table
+        newAggregationColumns = prev.aggregationColumns.filter(agg => 
+          !agg.column.startsWith(`${tableName}.`)
+        );
+        
+        // Remove group by columns that reference the deselected table
+        newGroupByColumns = prev.groupByColumns.filter(col => 
+          !col.startsWith(`${tableName}.`)
+        );
+        
+        // Remove filter conditions that reference the deselected table
+        newFilterConditions = prev.filterConditions.filter(filter => 
+          !filter.column.startsWith(`${tableName}.`)
+        );
+        
+        // Remove sort columns that reference the deselected table
+        newSortColumns = prev.sortColumns.filter(sort => 
+          !sort.column.startsWith(`${tableName}.`)
+        );
+      }
+      
       return {
         ...prev,
         selectedTables: newSelectedTables,
         selectedColumns: newSelectedColumns,
+        aggregationColumns: newAggregationColumns,
+        groupByColumns: newGroupByColumns,
+        filterConditions: newFilterConditions,
+        sortColumns: newSortColumns,
       };
     });
   };
 
   const handleColumnSelection = (tableName: string, columnName: string, checked: boolean) => {
-    setQueryState(prev => ({
-      ...prev,
-      selectedColumns: {
+    setQueryState(prev => {
+      const fullColumnName = `${tableName}.${columnName}`;
+      const newSelectedColumns = {
         ...prev.selectedColumns,
         [tableName]: checked
           ? [...(prev.selectedColumns[tableName] || []), columnName]
           : (prev.selectedColumns[tableName] || []).filter(c => c !== columnName),
-      },
-    }));
+      };
+      
+      let newGroupByColumns = [...prev.groupByColumns];
+      
+      // Auto-manage GROUP BY when aggregations exist
+      if (prev.aggregationColumns.length > 0) {
+        if (checked) {
+          // When adding a column and aggregations exist, automatically add to GROUP BY
+          if (!newGroupByColumns.includes(fullColumnName)) {
+            newGroupByColumns.push(fullColumnName);
+            toast({
+              title: "Auto-added to GROUP BY",
+              description: `${fullColumnName} was automatically added to GROUP BY since aggregations are used`,
+            });
+          }
+        } else {
+          // When removing a column, remove from GROUP BY
+          newGroupByColumns = newGroupByColumns.filter(col => col !== fullColumnName);
+        }
+      } else if (!checked) {
+        // When no aggregations, remove from GROUP BY if column is deselected
+        newGroupByColumns = newGroupByColumns.filter(col => col !== fullColumnName);
+      }
+      
+      return {
+        ...prev,
+        selectedColumns: newSelectedColumns,
+        groupByColumns: newGroupByColumns,
+      };
+    });
   };
 
   const handleGroupByToggle = (columnName: string) => {
@@ -344,10 +573,10 @@ export default function EnhancedQueryBuilder() {
   };
 
   const handleGenerateQuery = () => {
-    if (queryState.selectedTables.length === 0) {
+    if (!isQueryValid) {
       toast({
-        title: "Error",
-        description: "Please select at least one table",
+        title: "Query Validation Failed",
+        description: "Please fix the validation issues before generating the query",
         variant: "destructive",
       });
       return;
@@ -504,6 +733,40 @@ export default function EnhancedQueryBuilder() {
             </CardHeader>
             <CardContent>
               <p className="text-primary/80 text-sm">{naturalLanguagePreview}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Validation Feedback */}
+        {!isQueryValid && validationErrors.length > 0 && (
+          <Card className="mb-6 bg-destructive/5 border-destructive/20 dark:bg-destructive/10">
+            <CardHeader>
+              <CardTitle className="text-destructive text-sm flex items-center">
+                <Settings2 className="h-4 w-4 mr-2" />
+                Query Validation Issues
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1">
+                {validationErrors.map((error, index) => (
+                  <li key={index} className="text-destructive/80 text-sm flex items-start">
+                    <span className="inline-block w-1 h-1 bg-destructive/60 rounded-full mt-2 mr-2 flex-shrink-0"></span>
+                    {error}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Query Valid Indicator */}
+        {isQueryValid && queryState.selectedTables.length > 0 && (
+          <Card className="mb-6 bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800/30">
+            <CardContent className="pt-4">
+              <div className="flex items-center text-green-700 dark:text-green-400 text-sm">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                Query is valid and ready to generate
+              </div>
             </CardContent>
           </Card>
         )}
@@ -985,7 +1248,7 @@ export default function EnhancedQueryBuilder() {
             <div className="flex justify-between items-center">
               <Button 
                 onClick={handleGenerateQuery}
-                disabled={generateQueryMutation.isPending || queryState.selectedTables.length === 0}
+                disabled={generateQueryMutation.isPending || !isQueryValid}
                 className="px-6"
               >
                 {generateQueryMutation.isPending ? (
