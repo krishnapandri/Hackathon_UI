@@ -70,7 +70,6 @@ export default function EnhancedQueryBuilder() {
   
   // Enhanced filtering states
   const [columnSearch, setColumnSearch] = useState<string>("");
-  const [hideTypeStatus, setHideTypeStatus] = useState<boolean>(true);
   const [aggregationSearch, setAggregationSearch] = useState<string>("");
   const [groupBySearch, setGroupBySearch] = useState<string>("");
 
@@ -289,12 +288,13 @@ export default function EnhancedQueryBuilder() {
   };
 
   // Helper function for column filtering
-  const filterColumns = (columns: Array<{name: string, type: string}>, searchTerm: string, hideTypeStatus: boolean) => {
+  const filterColumns = (columns: Array<{name: string, type: string}>, searchTerm: string) => {
     return columns.filter(col => {
       const matchesSearch = col.name.toLowerCase().includes(searchTerm.toLowerCase());
       const isTypeStatus = col.name.toLowerCase().includes('typestatus');
       
-      if (hideTypeStatus && isTypeStatus) {
+      // Always filter out TypeStatus columns
+      if (isTypeStatus) {
         return false;
       }
       
@@ -389,7 +389,6 @@ export default function EnhancedQueryBuilder() {
     setColumnSearch("");
     setAggregationSearch("");
     setGroupBySearch("");
-    setHideTypeStatus(true);
   };
 
   // Get available columns for aggregations and group by
@@ -406,8 +405,7 @@ export default function EnhancedQueryBuilder() {
     
     return filterColumns(
       columns.map(col => ({ name: col.name, type: col.type })), 
-      aggregationSearch, 
-      hideTypeStatus
+      aggregationSearch
     ).map(col => {
       const fullCol = columns.find(c => c.name === col.name);
       return fullCol || { value: col.name, label: col.name, name: col.name, type: col.type };
@@ -564,34 +562,22 @@ export default function EnhancedQueryBuilder() {
                       <p className="text-sm text-neutral-600">Choose columns from selected tables</p>
                     </CardHeader>
                     <CardContent>
-                      {/* Search and Filter Controls */}
+                      {/* Search Controls */}
                       <div className="flex items-center gap-2 mb-4">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Filter className="h-4 w-4 text-gray-500" />
-                          <Input
-                            placeholder="Search columns..."
-                            value={columnSearch}
-                            onChange={(e) => setColumnSearch(e.target.value)}
-                            className="flex-1"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            id="hide-typestatus"
-                            checked={hideTypeStatus}
-                            onCheckedChange={setHideTypeStatus}
-                          />
-                          <Label htmlFor="hide-typestatus" className="text-sm">
-                            Hide TypeStatus columns
-                          </Label>
-                        </div>
+                        <Filter className="h-4 w-4 text-gray-500" />
+                        <Input
+                          placeholder="Search columns..."
+                          value={columnSearch}
+                          onChange={(e) => setColumnSearch(e.target.value)}
+                          className="flex-1"
+                        />
                       </div>
 
                       {queryState.selectedTables.map((tableName) => {
                         const table = tableData?.tables.find(t => t.name === tableName);
                         if (!table) return null;
 
-                        const filteredColumns = filterColumns(table.columns, columnSearch, hideTypeStatus);
+                        const filteredColumns = filterColumns(table.columns, columnSearch);
 
                         return (
                           <div key={tableName} className="mb-6 last:mb-0">
@@ -609,7 +595,6 @@ export default function EnhancedQueryBuilder() {
                                       className="w-3 h-3"
                                     />
                                     <span className="ml-2 text-neutral-700">{column.name}</span>
-                                    <span className="ml-1 text-xs text-neutral-400">({column.type})</span>
                                   </label>
                                 ))}
                               </div>
@@ -643,27 +628,15 @@ export default function EnhancedQueryBuilder() {
                     <p className="text-sm text-neutral-600">Apply mathematical operations to your data</p>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Search and Filter Controls for Aggregations */}
+                    {/* Search Controls for Aggregations */}
                     <div className="flex items-center gap-2 mb-4">
-                      <div className="flex items-center gap-2 flex-1">
-                        <Filter className="h-4 w-4 text-gray-500" />
-                        <Input
-                          placeholder="Search aggregation columns..."
-                          value={aggregationSearch}
-                          onChange={(e) => setAggregationSearch(e.target.value)}
-                          className="flex-1"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          id="hide-typestatus-agg"
-                          checked={hideTypeStatus}
-                          onCheckedChange={setHideTypeStatus}
-                        />
-                        <Label htmlFor="hide-typestatus-agg" className="text-sm">
-                          Hide TypeStatus
-                        </Label>
-                      </div>
+                      <Filter className="h-4 w-4 text-gray-500" />
+                      <Input
+                        placeholder="Search aggregation columns..."
+                        value={aggregationSearch}
+                        onChange={(e) => setAggregationSearch(e.target.value)}
+                        className="flex-1"
+                      />
                     </div>
                     {queryState.aggregationColumns.map((agg, index) => (
                       <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-neutral-200 rounded-lg">
