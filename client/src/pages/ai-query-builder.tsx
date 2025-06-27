@@ -30,7 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SqlQueryRequest, SqlQueryResponse, QueryExecutionResult } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
-interface TableMetadata {
+interface ViewMetadata {
   name: string;
   recordCount: number;
   columns: Array<{
@@ -101,8 +101,8 @@ export default function AIQueryBuilder() {
     }
   ];
 
-  // Fetch table metadata
-  const { data: tableData, isLoading: isLoadingTables } = useQuery<{ tables: TableMetadata[] }>({
+  // Fetch view metadata
+  const { data: viewData, isLoading: isLoadingViews } = useQuery<{ tables: ViewMetadata[] }>({
     queryKey: ['/api/tables'],
   });
 
@@ -207,7 +207,7 @@ export default function AIQueryBuilder() {
     setShowSuggestions(true);
   };
 
-  if (isLoadingTables) {
+  if (isLoadingViews) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -227,23 +227,23 @@ export default function AIQueryBuilder() {
           </div>
           <ScrollArea className="h-48">
             <div className="space-y-2">
-              {tableData?.tables.map((table) => (
-                <div key={table.name} className="text-sm">
+              {viewData?.tables.map((view: any) => (
+                <div key={view.name} className="text-sm">
                   <div className="flex items-center gap-2 py-1">
                     <Table className="h-3 w-3 text-muted-foreground" />
-                    <span className="font-medium capitalize">{table.name}</span>
-                    <span className="text-xs text-muted-foreground">({table.recordCount})</span>
+                    <span className="font-medium capitalize">{view.name}</span>
+                    <span className="text-xs text-muted-foreground">({view.columns.length} cols)</span>
                   </div>
                   <div className="ml-5 space-y-1">
-                    {table.columns.slice(0, 4).map((column) => (
+                    {view.columns.slice(0, 4).map((column: any) => (
                       <div key={column.name} className="text-xs text-muted-foreground flex items-center gap-1">
                         <span className="w-2 h-2 bg-muted-foreground/30 rounded-full"></span>
                         {column.name}
                       </div>
                     ))}
-                    {table.columns.length > 4 && (
+                    {view.columns.length > 4 && (
                       <div className="text-xs text-muted-foreground ml-3">
-                        +{table.columns.length - 4} more columns
+                        +{view.columns.length - 4} more columns
                       </div>
                     )}
                   </div>

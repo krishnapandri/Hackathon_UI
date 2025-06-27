@@ -103,53 +103,42 @@ export class MSSQLStorage implements IStorage {
       const pool = await this.getConnection();
       const request = pool.request();
 
-      // Get all tables with their column information, excluding _copy tables
-      const tableQuery = `
+      // Get all views with their column information, excluding _copy views
+      const viewQuery = `
         SELECT 
-          t.TABLE_NAME,
+          v.TABLE_NAME as VIEW_NAME,
           c.COLUMN_NAME,
           c.DATA_TYPE,
           c.IS_NULLABLE,
           c.CHARACTER_MAXIMUM_LENGTH,
           c.NUMERIC_PRECISION,
           c.NUMERIC_SCALE
-        FROM INFORMATION_SCHEMA.TABLES t
-        LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_NAME = c.TABLE_NAME
-        WHERE t.TABLE_TYPE = 'BASE TABLE'
-        AND t.TABLE_SCHEMA = 'dbo'
-        AND t.TABLE_NAME NOT LIKE '%_copy%'
-        AND t.TABLE_NAME NOT LIKE '%_Copy%'
-        AND t.TABLE_NAME NOT LIKE '%_COPY%'
-        ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION
+        FROM INFORMATION_SCHEMA.VIEWS v
+        LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON v.TABLE_NAME = c.TABLE_NAME
+        WHERE v.TABLE_SCHEMA = 'dbo'
+        AND v.TABLE_NAME NOT LIKE '%_copy%'
+        AND v.TABLE_NAME NOT LIKE '%_Copy%'
+        AND v.TABLE_NAME NOT LIKE '%_COPY%'
+        ORDER BY v.TABLE_NAME, c.ORDINAL_POSITION
       `;
 
-      const result = await request.query(tableQuery);
+      const result = await request.query(viewQuery);
       
-      // Group by table name
-      const tablesMap = new Map<string, MSSQLTableMetadata>();
+      // Group by view name and build view metadata
+      const viewsMap = new Map<string, MSSQLTableMetadata>();
       
       for (const row of result.recordset as any[]) {
-        const tableName = row.TABLE_NAME;
+        const viewName = row.VIEW_NAME;
         
-        if (!tablesMap.has(tableName)) {
-          // Get row count for this table
-          const countRequest = pool.request();
-          let recordCount = 0;
-          try {
-            const countResult = await countRequest.query(`SELECT COUNT(*) as count FROM [${tableName}]`);
-            recordCount = countResult.recordset[0]?.count || 0;
-          } catch (error) {
-            console.warn(`Could not get count for table ${tableName}:`, error);
-          }
-
-          tablesMap.set(tableName, {
-            name: tableName,
-            recordCount,
+        if (!viewsMap.has(viewName)) {
+          viewsMap.set(viewName, {
+            name: viewName,
+            recordCount: 0, // Views with WHERE 1=2 return no rows
             columns: []
           });
         }
 
-        const table = tablesMap.get(tableName)!;
+        const view = viewsMap.get(viewName)!;
         if (row.COLUMN_NAME) {
           let dataType = row.DATA_TYPE;
           if (row.CHARACTER_MAXIMUM_LENGTH) {
@@ -158,19 +147,36 @@ export class MSSQLStorage implements IStorage {
             dataType += `(${row.NUMERIC_PRECISION}${row.NUMERIC_SCALE ? ',' + row.NUMERIC_SCALE : ''})`;
           }
 
-          table.columns.push({
+          view.columns.push({
             name: row.COLUMN_NAME,
             type: dataType
           });
         }
       }
 
+      // Validate each view by querying with WHERE 1=2 to ensure column access
+      const views = Array.from(viewsMap.values());
+      for (const view of views) {
+        try {
+          const testRequest = pool.request();
+          await testRequest.query(`SELECT * FROM [${view.name}] WHERE 1=2`);
+          console.log(`View ${view.name} is accessible with ${view.columns.length} columns`);
+        } catch (error) {
+          console.warn(`View ${view.name} access test failed:`, error);
+          // Remove inaccessible views
+          const index = views.indexOf(view);
+          if (index > -1) {
+            views.splice(index, 1);
+          }
+        }
+      }
+
       return {
-        tables: Array.from(tablesMap.values())
+        tables: views
       };
     } catch (error) {
-      console.error('Error fetching table metadata:', error);
-      throw new Error(`Failed to fetch table metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error fetching view metadata:', error);
+      throw new Error(`Failed to fetch view metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

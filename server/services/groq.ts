@@ -26,11 +26,11 @@ export async function generateSqlQuery(
       },
     };
 
-    // Build schema description
-    let schemaDescription = "Database Schema (Microsoft SQL Server):\n";
-    tableMetadata.tables.forEach((table) => {
-      schemaDescription += `\n- ${table.name} (${table.recordCount} records):\n`;
-      table.columns.forEach((column) => {
+    // Build schema description for views
+    let schemaDescription = "Database Schema (Microsoft SQL Server Views):\n";
+    tableMetadata.tables.forEach((view) => {
+      schemaDescription += `\n- ${view.name} (View - query with WHERE 1=2 for structure):\n`;
+      view.columns.forEach((column) => {
         schemaDescription += `  • ${column.name}: ${column.type}\n`;
       });
     });
@@ -81,13 +81,14 @@ ${businessRulesContext}
 CRITICAL RULES - MUST BE FOLLOWED:
 - Generate only SELECT queries for data analysis
 - ALWAYS include WHERE clause with these mandatory conditions: ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
-- NEVER query tables containing patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(", ")}
-- Use proper SQL Server T-SQL syntax
-- Include appropriate JOINs when querying multiple tables
+- You are working with VIEWS, not tables - all schema objects are views
+- NEVER query views containing patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(", ")}
+- Use proper SQL Server T-SQL syntax for views
+- Include appropriate JOINs when querying multiple views
 - Handle date/time queries with SQL Server functions
 - Use aggregation functions when requested (SUM, AVG, COUNT, etc.)
 - Always use TOP clause for safety (default TOP 100)
-- Use [square brackets] for table/column names when needed
+- Use [square brackets] for view/column names when needed
 - Handle NULL values appropriately with ISNULL() or COALESCE()
 - For matrix queries, generate proper pivot/unpivot or case statements
 - Use ORDER BY for sorted results
@@ -95,10 +96,12 @@ CRITICAL RULES - MUST BE FOLLOWED:
 
 QUERY STRUCTURE TEMPLATE:
 SELECT TOP 100 [columns]
-FROM [table_name]
+FROM [view_name]
 WHERE ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
   AND [additional_conditions]
 [ORDER BY clause]
+
+Note: All database objects are views. When user asks for "table" data, query the corresponding view.
 
 Return only valid T-SQL without explanations or markdown formatting.`;
 

@@ -102,13 +102,14 @@ The application manages a simple ERP-style database with four main entities:
 
 ## Recent Changes
 
-- **June 27, 2025**: Rules Configuration System & MSSQL Integration
+- **June 27, 2025**: Rules Configuration System & MSSQL Views Integration
   - **Added Rules Configuration tab** - Accessible via Alt+Z keyboard shortcut
-  - **Integrated Microsoft SQL Server database** - Connected to production database with connection string
-  - **Implemented business rules engine** - Customizable formulas and constraints for AI query generation
+  - **Integrated Microsoft SQL Server views** - Connected to production database views instead of tables
+  - **Implemented WHERE 1=2 column discovery** - Query views with WHERE 1=2 to get column structure without data
+  - **Business rules engine** - Customizable formulas and constraints for AI query generation
   - **Added mandatory query conditions** - All queries include company_id and typestatus = 200 filters
-  - **Excluded _copy tables** - System automatically filters out backup/copy tables from schema
-  - **Enhanced AI context** - Groq AI now uses custom business rules and database-specific constraints
+  - **Excluded _copy views** - System automatically filters out backup/copy views from schema
+  - **Enhanced AI context** - Groq AI now uses custom business rules and view-specific constraints
   - **Added keyboard shortcuts** - Alt+Z opens Rules Configuration for quick access
   - **Production-ready query generation** - Ensures all SQL follows business rules and security constraints
 
