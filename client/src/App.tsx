@@ -36,7 +36,7 @@ function Navigation() {
           <span className="font-semibold text-neutral-800">ERP Query Builder</span>
         </div>
         <div className="flex space-x-2">
-          <Link href="/">
+          {/* <Link href="/">
             <Button 
               variant={location === "/" ? "default" : "ghost"} 
               size="sm"
@@ -44,7 +44,7 @@ function Navigation() {
               <Database className="h-4 w-4 mr-2" />
               Basic Builder
             </Button>
-          </Link>
+          </Link> */}
           <Link href="/enhanced">
             <Button 
               variant={location === "/enhanced" ? "default" : "ghost"} 

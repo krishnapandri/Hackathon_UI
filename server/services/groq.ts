@@ -1,32 +1,36 @@
 import Groq from "groq-sdk";
 import { SqlQueryRequest, SqlQueryResponse } from "@shared/schema";
 import { storage } from "../storage";
+import dotenv from "dotenv";
+dotenv.config();
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-export async function generateSqlQuery(request: SqlQueryRequest): Promise<SqlQueryResponse> {
+export async function generateSqlQuery(
+  request: SqlQueryRequest,
+): Promise<SqlQueryResponse> {
   try {
     // Get actual database schema
     const tableMetadata = await storage.getTableMetadata();
-    
+
     // Get rules configuration from global storage
     const rulesConfig = (global as any).rulesConfig || {
       businessRules: [],
       queryConfig: {
-        companyIdField: 'company_id',
+        companyIdField: "company_id",
         typeStatusValue: 200,
-        excludeTablePatterns: ['_copy'],
-        defaultConditions: ['company_id IS NOT NULL', 'typestatus = 200']
-      }
+        excludeTablePatterns: ["_copy"],
+        defaultConditions: ["company_id IS NOT NULL", "typestatus = 200"],
+      },
     };
-    
+
     // Build schema description
     let schemaDescription = "Database Schema (Microsoft SQL Server):\n";
-    tableMetadata.tables.forEach(table => {
+    tableMetadata.tables.forEach((table) => {
       schemaDescription += `\n- ${table.name} (${table.recordCount} records):\n`;
-      table.columns.forEach(column => {
+      table.columns.forEach((column) => {
         schemaDescription += `  • ${column.name}: ${column.type}\n`;
       });
     });
@@ -35,7 +39,7 @@ export async function generateSqlQuery(request: SqlQueryRequest): Promise<SqlQue
     let businessRulesContext = `
 Business Rules and Context:
 `;
-    
+
     rulesConfig.businessRules.forEach((rule: any, index: number) => {
       if (rule.isActive) {
         businessRulesContext += `${index + 1}. ${rule.name}: ${rule.description}\n   Formula: ${rule.formula}\n`;
@@ -54,8 +58,8 @@ Additional Rules:
 - Data Types: Handle DECIMAL/NUMERIC for financial calculations properly
 
 Mandatory Query Constraints:
-- ALWAYS include WHERE clause with: ${rulesConfig.queryConfig.defaultConditions.join(' AND ')}
-- NEVER use tables matching patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(', ')}
+- ALWAYS include WHERE clause with: ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
+- NEVER use tables matching patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(", ")}
 - Company ID field: ${rulesConfig.queryConfig.companyIdField}
 - Type Status value: ${rulesConfig.queryConfig.typeStatusValue}
 
@@ -76,8 +80,8 @@ ${businessRulesContext}
 
 CRITICAL RULES - MUST BE FOLLOWED:
 - Generate only SELECT queries for data analysis
-- ALWAYS include WHERE clause with these mandatory conditions: ${rulesConfig.queryConfig.defaultConditions.join(' AND ')}
-- NEVER query tables containing patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(', ')}
+- ALWAYS include WHERE clause with these mandatory conditions: ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
+- NEVER query tables containing patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(", ")}
 - Use proper SQL Server T-SQL syntax
 - Include appropriate JOINs when querying multiple tables
 - Handle date/time queries with SQL Server functions
@@ -92,7 +96,7 @@ CRITICAL RULES - MUST BE FOLLOWED:
 QUERY STRUCTURE TEMPLATE:
 SELECT TOP 100 [columns]
 FROM [table_name]
-WHERE ${rulesConfig.queryConfig.defaultConditions.join(' AND ')}
+WHERE ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
   AND [additional_conditions]
 [ORDER BY clause]
 
@@ -103,7 +107,7 @@ Return only valid T-SQL without explanations or markdown formatting.`;
     const completion = await groq.chat.completions.create({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
+        { role: "user", content: userPrompt },
       ],
       model: "llama-3.3-70b-versatile",
       temperature: 0.1,
@@ -111,10 +115,13 @@ Return only valid T-SQL without explanations or markdown formatting.`;
     });
 
     const sql = completion.choices[0]?.message?.content?.trim() || "";
-    
+
     // Clean up the SQL (remove any markdown formatting if present)
-    const cleanSql = sql.replace(/```sql\n?/g, '').replace(/```\n?/g, '').trim();
-    
+    const cleanSql = sql
+      .replace(/```sql\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
     return {
       sql: cleanSql,
       naturalLanguage: request.naturalLanguageQuery,
@@ -124,7 +131,8 @@ Return only valid T-SQL without explanations or markdown formatting.`;
     return {
       sql: "",
       naturalLanguage: request.naturalLanguageQuery,
-      error: "Failed to generate SQL query. Please check your API key and try again.",
+      error:
+        "Failed to generate SQL query. Please check your API key and try again.",
     };
   }
 }
