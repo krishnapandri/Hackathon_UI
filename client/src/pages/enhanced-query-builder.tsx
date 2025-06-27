@@ -67,6 +67,12 @@ export default function EnhancedQueryBuilder() {
   const [queryResults, setQueryResults] = useState<QueryExecutionResult | null>(null);
   const [naturalLanguagePreview, setNaturalLanguagePreview] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
+  
+  // Enhanced filtering states
+  const [columnSearch, setColumnSearch] = useState<string>("");
+  const [hideTypeStatus, setHideTypeStatus] = useState<boolean>(true);
+  const [aggregationSearch, setAggregationSearch] = useState<string>("");
+  const [groupBySearch, setGroupBySearch] = useState<string>("");
 
   // Fetch table metadata
   const { data: tableData, isLoading: tablesLoading } = useQuery<{ tables: TableMetadata[] }>({
@@ -171,15 +177,7 @@ export default function EnhancedQueryBuilder() {
     }
   }, [queryState]);
 
-  // Calculate available columns from selected tables
-  const availableColumns = queryState.selectedTables.flatMap(tableName => {
-    const table = tableData?.tables.find(t => t.name === tableName);
-    return table?.columns.map(col => ({
-      value: `${tableName}.${col.name}`,
-      label: `${tableName}.${col.name}`,
-      type: col.type
-    })) || [];
-  });
+
 
   const addAggregationColumn = () => {
     setQueryState(prev => ({
@@ -290,6 +288,20 @@ export default function EnhancedQueryBuilder() {
     }));
   };
 
+  // Helper function for column filtering
+  const filterColumns = (columns: Array<{name: string, type: string}>, searchTerm: string, hideTypeStatus: boolean) => {
+    return columns.filter(col => {
+      const matchesSearch = col.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const isTypeStatus = col.name.toLowerCase().includes('typestatus');
+      
+      if (hideTypeStatus && isTypeStatus) {
+        return false;
+      }
+      
+      return matchesSearch;
+    });
+  };
+
   const handleTableSelection = (tableName: string, checked: boolean) => {
     setQueryState(prev => {
       const newSelectedTables = checked 
@@ -374,7 +386,35 @@ export default function EnhancedQueryBuilder() {
     });
     setGeneratedQuery(null);
     setQueryResults(null);
+    setColumnSearch("");
+    setAggregationSearch("");
+    setGroupBySearch("");
+    setHideTypeStatus(true);
   };
+
+  // Get available columns for aggregations and group by
+  const getAvailableColumns = () => {
+    const columns = queryState.selectedTables.flatMap(tableName => {
+      const table = tableData?.tables.find(t => t.name === tableName);
+      return table?.columns.map(col => ({
+        value: `${tableName}.${col.name}`,
+        label: `${tableName}.${col.name}`,
+        name: col.name,
+        type: col.type
+      })) || [];
+    });
+    
+    return filterColumns(
+      columns.map(col => ({ name: col.name, type: col.type })), 
+      aggregationSearch, 
+      hideTypeStatus
+    ).map(col => {
+      const fullCol = columns.find(c => c.name === col.name);
+      return fullCol || { value: col.name, label: col.name, name: col.name, type: col.type };
+    });
+  };
+
+
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -524,29 +564,60 @@ export default function EnhancedQueryBuilder() {
                       <p className="text-sm text-neutral-600">Choose columns from selected tables</p>
                     </CardHeader>
                     <CardContent>
+                      {/* Search and Filter Controls */}
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Filter className="h-4 w-4 text-gray-500" />
+                          <Input
+                            placeholder="Search columns..."
+                            value={columnSearch}
+                            onChange={(e) => setColumnSearch(e.target.value)}
+                            className="flex-1"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="hide-typestatus"
+                            checked={hideTypeStatus}
+                            onCheckedChange={setHideTypeStatus}
+                          />
+                          <Label htmlFor="hide-typestatus" className="text-sm">
+                            Hide TypeStatus columns
+                          </Label>
+                        </div>
+                      </div>
+
                       {queryState.selectedTables.map((tableName) => {
                         const table = tableData?.tables.find(t => t.name === tableName);
                         if (!table) return null;
+
+                        const filteredColumns = filterColumns(table.columns, columnSearch, hideTypeStatus);
 
                         return (
                           <div key={tableName} className="mb-6 last:mb-0">
                             <h3 className="text-sm font-medium text-neutral-700 mb-3 flex items-center">
                               <TableIcon className="text-neutral-400 mr-2 text-xs" />
-                              {tableName}
+                              {tableName} ({filteredColumns.length} columns)
                             </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                              {table.columns.map((column) => (
-                                <label key={column.name} className="flex items-center text-sm">
-                                  <Checkbox
-                                    checked={(queryState.selectedColumns[tableName] || []).includes(column.name)}
-                                    onCheckedChange={(checked) => handleColumnSelection(tableName, column.name, checked as boolean)}
-                                    className="w-3 h-3"
-                                  />
-                                  <span className="ml-2 text-neutral-700">{column.name}</span>
-                                  {/* <span className="ml-1 text-xs text-neutral-400">({column.type})</span> */}
-                                </label>
-                              ))}
-                            </div>
+                            {filteredColumns.length > 0 ? (
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {filteredColumns.map((column) => (
+                                  <label key={column.name} className="flex items-center text-sm">
+                                    <Checkbox
+                                      checked={(queryState.selectedColumns[tableName] || []).includes(column.name)}
+                                      onCheckedChange={(checked) => handleColumnSelection(tableName, column.name, checked as boolean)}
+                                      className="w-3 h-3"
+                                    />
+                                    <span className="ml-2 text-neutral-700">{column.name}</span>
+                                    <span className="ml-1 text-xs text-neutral-400">({column.type})</span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-gray-500 text-sm">
+                                No columns match the current filters
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -572,6 +643,28 @@ export default function EnhancedQueryBuilder() {
                     <p className="text-sm text-neutral-600">Apply mathematical operations to your data</p>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Search and Filter Controls for Aggregations */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="flex items-center gap-2 flex-1">
+                        <Filter className="h-4 w-4 text-gray-500" />
+                        <Input
+                          placeholder="Search aggregation columns..."
+                          value={aggregationSearch}
+                          onChange={(e) => setAggregationSearch(e.target.value)}
+                          className="flex-1"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id="hide-typestatus-agg"
+                          checked={hideTypeStatus}
+                          onCheckedChange={setHideTypeStatus}
+                        />
+                        <Label htmlFor="hide-typestatus-agg" className="text-sm">
+                          Hide TypeStatus
+                        </Label>
+                      </div>
+                    </div>
                     {queryState.aggregationColumns.map((agg, index) => (
                       <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border border-neutral-200 rounded-lg">
                         <div>
@@ -603,7 +696,7 @@ export default function EnhancedQueryBuilder() {
                               <SelectValue placeholder="Select column..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableColumns.map((column) => (
+                              {getAvailableColumns().map((column) => (
                                 <SelectItem key={column.value} value={column.value}>
                                   {column.label}
                                 </SelectItem>
@@ -643,7 +736,7 @@ export default function EnhancedQueryBuilder() {
                         <div>
                           <Label className="text-sm font-medium text-neutral-700 mb-2 block">Group By Columns</Label>
                           <div className="flex flex-wrap gap-2">
-                            {availableColumns.map((column) => (
+                            {getAvailableColumns().map((column) => (
                               <Badge
                                 key={column.value}
                                 variant={queryState.groupByColumns.includes(column.value) ? "default" : "outline"}
@@ -707,7 +800,7 @@ export default function EnhancedQueryBuilder() {
                               <SelectValue placeholder="Select column..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableColumns.map((column) => (
+                              {getAvailableColumns().map((column) => (
                                 <SelectItem key={column.value} value={column.value}>
                                   {column.label}
                                 </SelectItem>
@@ -821,7 +914,7 @@ export default function EnhancedQueryBuilder() {
                               <SelectValue placeholder="Select column..." />
                             </SelectTrigger>
                             <SelectContent>
-                              {availableColumns.map((column) => (
+                              {getAvailableColumns().map((column) => (
                                 <SelectItem key={column.value} value={column.value}>
                                   {column.label}
                                 </SelectItem>
