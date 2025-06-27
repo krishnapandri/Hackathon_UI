@@ -30,6 +30,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate SQL query using LLM (alternative endpoint)
+  app.post("/api/generate-sql", async (req, res) => {
+    try {
+      const validatedRequest = sqlQueryRequest.parse(req.body);
+      const result = await generateSqlQuery(validatedRequest);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof Error && error.name === "ZodError") {
+        res.status(400).json({ error: "Invalid request format" });
+      } else {
+        res.status(500).json({ error: "Failed to generate SQL query" });
+      }
+    }
+  });
+
   // Execute SQL query
   app.post("/api/execute-query", async (req, res) => {
     try {
