@@ -527,7 +527,7 @@ export default function EnhancedQueryBuilder() {
                                     className="w-3 h-3"
                                   />
                                   <span className="ml-2 text-neutral-700">{column.name}</span>
-                                  <span className="ml-1 text-xs text-neutral-400">({column.type})</span>
+                                  {/* <span className="ml-1 text-xs text-neutral-400">({column.type})</span> */}
                                 </label>
                               ))}
                             </div>

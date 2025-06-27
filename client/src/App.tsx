@@ -45,9 +45,9 @@ function Navigation() {
               Basic Builder
             </Button>
           </Link> */}
-          <Link href="/enhanced">
+          <Link href="/">
             <Button 
-              variant={location === "/enhanced" ? "default" : "ghost"} 
+              variant={location === "/" ? "default" : "ghost"} 
               size="sm"
             >
               <Sparkles className="h-4 w-4 mr-2" />
@@ -83,8 +83,8 @@ function Router() {
     <>
       <Navigation />
       <Switch>
-        <Route path="/" component={QueryBuilder} />
-        <Route path="/enhanced" component={EnhancedQueryBuilder} />
+        <Route path="/" component={EnhancedQueryBuilder} />
+        {/* <Route path="/" component={QueryBuilder} /> */}
         <Route path="/ai-builder" component={AIQueryBuilder} />
         <Route path="/rules-config" component={RulesConfig} />
         <Route component={NotFound} />
