@@ -102,17 +102,44 @@ export async function generateSqlQuery(
       request.filterConditions.forEach(filter => {
         let condition = `[${filter.column}] ${filter.operator}`;
         
+        // Helper function to format value based on data type
+        const formatValue = (value: any) => {
+          if (value === null || value === undefined) return 'NULL';
+          
+          // Check if it's a number (including decimal numbers)
+          const numericValue = Number(value);
+          if (!isNaN(numericValue) && isFinite(numericValue) && value !== '' && value !== true && value !== false) {
+            return numericValue.toString();
+          }
+          
+          // Check if it's a boolean
+          if (typeof value === 'boolean') {
+            return value ? '1' : '0';
+          }
+          
+          // Check if it looks like a date
+          const dateValue = new Date(value);
+          if (!isNaN(dateValue.getTime()) && typeof value === 'string' && (
+            value.includes('-') || value.includes('/') || value.toLowerCase().includes('date')
+          )) {
+            return `'${value}'`;
+          }
+          
+          // Default to string - escape single quotes
+          return `'${String(value).replace(/'/g, "''")}'`;
+        };
+        
         if (filter.operator === "BETWEEN" && filter.value && filter.value2) {
-          condition += ` ${filter.value} AND ${filter.value2}`;
+          condition += ` ${formatValue(filter.value)} AND ${formatValue(filter.value2)}`;
         } else if (filter.operator === "IN" || filter.operator === "NOT IN") {
           const values = Array.isArray(filter.value) ? filter.value : [filter.value];
-          condition += ` (${values.map(v => typeof v === 'string' ? `'${v}'` : v).join(', ')})`;
+          condition += ` (${values.map(v => formatValue(v)).join(', ')})`;
         } else if (filter.operator === "IS NULL" || filter.operator === "IS NOT NULL") {
           // No value needed
         } else if (filter.operator === "LIKE") {
-          condition += ` '%${filter.value}%'`;
-        } else if (filter.value !== undefined) {
-          condition += typeof filter.value === 'string' ? ` '${filter.value}'` : ` ${filter.value}`;
+          condition += ` '%${String(filter.value).replace(/'/g, "''")}%'`;
+        } else if (filter.value !== undefined && filter.value !== '') {
+          condition += ` ${formatValue(filter.value)}`;
         }
         
         whereConditions.push(condition);

@@ -227,13 +227,26 @@ export default function EnhancedQueryBuilder() {
         if (i === index) {
           // Handle different field types appropriately
           if (field === 'value') {
-            // Convert to appropriate type based on operator
+            // Convert to appropriate type based on operator and column type
             if (filter.operator === 'IN' || filter.operator === 'NOT IN') {
-              // For IN operators, split comma-separated values
-              const arrayValue = typeof value === 'string' ? value.split(',').map(v => v.trim()) : value;
+              // For IN operators, split comma-separated values and convert types
+              const arrayValue = typeof value === 'string' ? 
+                value.split(',').map(v => {
+                  const trimmed = v.trim();
+                  // Try to convert to number if it looks numeric
+                  const numValue = Number(trimmed);
+                  return !isNaN(numValue) && isFinite(numValue) && trimmed !== '' ? numValue : trimmed;
+                }) : value;
               return { ...filter, [field]: arrayValue };
             } else {
-              // For other operators, use string value
+              // For other operators, try to intelligently convert value type
+              if (typeof value === 'string' && value !== '') {
+                // Try to convert to number if it looks numeric
+                const numValue = Number(value);
+                if (!isNaN(numValue) && isFinite(numValue)) {
+                  return { ...filter, [field]: numValue };
+                }
+              }
               return { ...filter, [field]: value };
             }
           }

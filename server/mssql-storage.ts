@@ -140,6 +140,12 @@ export class MSSQLStorage implements IStorage {
 
         const view = viewsMap.get(viewName)!;
         if (row.COLUMN_NAME) {
+          // Filter out columns ending with '_ID' and 'typestatus'
+          const columnName = row.COLUMN_NAME;
+          if (columnName.toLowerCase().endsWith('_id') || columnName.toLowerCase() === 'typestatus') {
+            continue; // Skip these columns
+          }
+
           let dataType = row.DATA_TYPE;
           if (row.CHARACTER_MAXIMUM_LENGTH) {
             dataType += `(${row.CHARACTER_MAXIMUM_LENGTH})`;
@@ -148,7 +154,7 @@ export class MSSQLStorage implements IStorage {
           }
 
           view.columns.push({
-            name: row.COLUMN_NAME,
+            name: columnName,
             type: dataType
           });
         }
