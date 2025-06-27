@@ -31,10 +31,10 @@ export async function generateSqlQuery(
     const rulesConfig = (global as any).rulesConfig || {
       businessRules: [],
       queryConfig: {
-        companyIdField: "company_id",
+        companyIdField: "CompanyPincode",
         typeStatusValue: 200,
         excludeTablePatterns: ["_copy"],
-        defaultConditions: ["company_id IS NOT NULL", "typestatus = 200"],
+        defaultConditions: ["CompanyTypeStatus IS NOT NULL", "SalesTypeStatus = 200"],
       },
     };
 
@@ -84,18 +84,42 @@ export async function generateSqlQuery(
     
     sqlQuery += columns.join(", ");
     
-    // FROM clause
-    sqlQuery += `\nFROM [${request.selectedTables[0]}]`;
+    // FROM clause with table alias
+    const mainTable = request.selectedTables[0];
+    const tableAlias = mainTable.toLowerCase().substring(0, 2);
+    sqlQuery += `\nFROM [${mainTable}] ${tableAlias}`;
     
     // Handle multiple tables with JOINs (simplified - inner join for now)
     if (request.selectedTables.length > 1) {
       for (let i = 1; i < request.selectedTables.length; i++) {
-        sqlQuery += `\nINNER JOIN [${request.selectedTables[i]}] ON 1=1`; // Placeholder join
+        const joinTable = request.selectedTables[i];
+        const joinAlias = joinTable.toLowerCase().substring(0, 2);
+        sqlQuery += `\nINNER JOIN [${joinTable}] ${joinAlias} ON 1=1`; // Placeholder join
       }
     }
     
-    // WHERE clause - always include mandatory conditions
-    let whereConditions = [...rulesConfig.queryConfig.defaultConditions];
+    // WHERE clause - always include mandatory conditions with proper table prefixes
+    let whereConditions: string[] = [];
+    
+    // Add table-specific mandatory conditions
+    if (request.selectedTables.length > 0) {
+      const mainTable = request.selectedTables[0];
+      const tableAlias = mainTable.toLowerCase().substring(0, 2);
+      
+      if (mainTable.toLowerCase() === 'sales') {
+        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
+        whereConditions.push(`${tableAlias}.SalesTypeStatus = 200`);
+      } else if (mainTable.toLowerCase() === 'stock') {
+        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
+        whereConditions.push(`${tableAlias}.StockTypeStatus = 200`);
+      } else if (mainTable.toLowerCase() === 'salesreturn') {
+        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
+        whereConditions.push(`${tableAlias}.SalesReturnTypeStatus = 200`);
+      } else {
+        // Generic fallback for other tables
+        whereConditions.push(`${tableAlias}.CompanyTypeStatus IS NOT NULL`);
+      }
+    }
     
     // Add custom filter conditions
     if (request.filterConditions && request.filterConditions.length > 0) {
@@ -190,10 +214,10 @@ export async function generateAISqlQuery(
     const rulesConfig = (global as any).rulesConfig || {
       businessRules: [],
       queryConfig: {
-        companyIdField: "company_id",
+        companyIdField: "CompanyPincode",
         typeStatusValue: 200,
         excludeTablePatterns: ["_copy"],
-        defaultConditions: ["company_id IS NOT NULL", "typestatus = 200"],
+        defaultConditions: ["CompanyTypeStatus IS NOT NULL", "SalesTypeStatus = 200"],
       },
     };
 
@@ -251,7 +275,7 @@ ${businessRulesContext}
 
 CRITICAL RULES - MUST BE FOLLOWED:
 - Generate only SELECT queries for data analysis
-- ALWAYS include WHERE clause with these mandatory conditions: ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
+- ALWAYS include WHERE clause with mandatory conditions, using proper table prefixes
 - You are working with VIEWS, not tables - all schema objects are views
 - NEVER query views containing patterns: ${rulesConfig.queryConfig.excludeTablePatterns.join(", ")}
 - Use proper SQL Server T-SQL syntax for views
@@ -265,10 +289,16 @@ CRITICAL RULES - MUST BE FOLLOWED:
 - Consider using window functions for analytical queries
 - Only use TOP clause if specifically requested (avoid default TOP 100)
 
+MANDATORY WHERE CONDITIONS:
+When querying Sales view: WHERE s.CompanyTypeStatus IS NOT NULL AND s.SalesTypeStatus = 200
+When querying Stock view: WHERE st.CompanyTypeStatus IS NOT NULL AND st.StockTypeStatus = 200  
+When querying SalesReturn view: WHERE sr.CompanyTypeStatus IS NOT NULL AND sr.SalesReturnTypeStatus = 200
+Always use proper table aliases and prefix column names with the alias.
+
 QUERY STRUCTURE TEMPLATE:
-SELECT [columns]
-FROM [view_name]
-WHERE ${rulesConfig.queryConfig.defaultConditions.join(" AND ")}
+SELECT [columns with table prefixes]
+FROM [view_name] alias
+WHERE alias.CompanyTypeStatus IS NOT NULL AND alias.[ViewType]Status = 200
   AND [additional_conditions]
 [ORDER BY clause]
 
