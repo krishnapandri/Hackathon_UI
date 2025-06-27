@@ -491,7 +491,7 @@ export default function EnhancedQueryBuilder() {
                             />
                             <div className="ml-3">
                               <div className="text-sm font-medium text-neutral-800">{table.name}</div>
-                              <div className="text-xs text-neutral-500">{table.recordCount} records</div>
+                              {/* <div className="text-xs text-neutral-500">{table.recordCount} records</div> */}
                             </div>
                           </label>
                         ))}
