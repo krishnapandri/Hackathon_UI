@@ -337,11 +337,15 @@ Business Rules and Context:
     businessRulesContext += `
 Additional Rules:
 - Financial Calculations: Always handle NULL values appropriately using ISNULL() or COALESCE()
+- Division Operations: ALWAYS use NULLIF() to prevent divide by zero errors (e.g., value1/NULLIF(value2,0))
+- Mathematical Safety: Use CASE WHEN statements to check for zero denominators before division
 - Date Handling: Use SQL Server date functions (GETDATE(), DATEADD(), DATEDIFF(), etc.)
-- Performance: Consider using appropriate indexes and limit result sets
+- Performance: Consider using appropriate indexes and limit result sets with TOP clause
 - Aggregations: Use SUM(), AVG(), COUNT(), MIN(), MAX() for financial metrics
 - String Operations: Use SQL Server string functions (CONCAT(), SUBSTRING(), LEN(), etc.)
 - Conditional Logic: Use CASE WHEN statements for complex business logic
+- Error Prevention: Always validate data before mathematical operations
+- Example Safe Division: CASE WHEN SalesFinalSaleRate > 0 THEN (SalesFinalSaleRate - SalesPurchaseCost) / SalesFinalSaleRate * 100 ELSE 0 END
 - Window Functions: Use ROW_NUMBER(), RANK(), PARTITION BY for analytical queries
 - Data Types: Handle DECIMAL/NUMERIC for financial calculations properly
 
@@ -383,6 +387,15 @@ CRITICAL RULES - MUST BE FOLLOWED:
 - NEVER use TOP clause unless the user explicitly requests a specific number (like "top 5", "first 10", "limit to 20")
 - When user says "highest" or "lowest" without a number, use ORDER BY without TOP clause
 
+MATHEMATICAL OPERATION SAFETY (CRITICAL):
+- ALWAYS prevent divide by zero errors using NULLIF(denominator, 0)
+- Use CASE WHEN for complex mathematical validations
+- Example safe profit margin: CASE WHEN s.SalesFinalSaleRate > 0 THEN (s.SalesFinalSaleRate - s.SalesPurchaseCost) / s.SalesFinalSaleRate * 100 ELSE 0 END
+- Alternative safe division: (s.SalesFinalSaleRate - s.SalesPurchaseCost) / NULLIF(s.SalesFinalSaleRate, 0) * 100
+- For percentage calculations, multiply by 100.0 (not 100) to force decimal precision
+- Always validate denominators before any division operation
+- Use TRY_CAST() when converting data types that might fail
+
 MANDATORY WHERE CONDITIONS:
 When querying Sales view: WHERE s.CompanyTypeStatus IS NOT NULL AND s.SalesTypeStatus = 200
 When querying Stock view: WHERE st.CompanyTypeStatus IS NOT NULL AND st.StockTypeStatus = 200  
@@ -395,6 +408,18 @@ FROM [view_name] alias
 WHERE alias.CompanyTypeStatus IS NOT NULL AND alias.[ViewType]Status = 200
   AND [additional_conditions]
 [ORDER BY clause]
+
+PROFIT MARGIN CALCULATION EXAMPLE (USE THIS PATTERN):
+For profit margin queries, ALWAYS use this safe pattern:
+SELECT s.ItemCode, s.ItemDescription,
+    CASE 
+        WHEN s.SalesFinalSaleRate > 0 THEN 
+            (s.SalesFinalSaleRate - ISNULL(s.SalesPurchaseCost, 0)) / s.SalesFinalSaleRate * 100.0 
+        ELSE 0 
+    END AS ProfitMargin
+FROM Sales s
+WHERE s.CompanyTypeStatus IS NOT NULL AND s.SalesTypeStatus = 200
+ORDER BY ProfitMargin DESC
 
 IMPORTANT: Only add TOP N if user explicitly mentions:
 - "top 5", "first 10", "limit 20", "show me 15", etc.
@@ -426,8 +451,16 @@ Return only valid T-SQL without explanations or markdown formatting.`;
 
     console.log("🤖 AI Generated SQL:", cleanSql);
 
+    // Post-process the SQL to fix common mathematical safety issues
+    const safeSql = fixMathematicalSafety(cleanSql);
+    
+    if (safeSql !== cleanSql) {
+      console.log("🔧 Applied mathematical safety fixes to AI-generated SQL");
+      console.log("🔧 Safe SQL:", safeSql);
+    }
+
     return {
-      sql: cleanSql,
+      sql: safeSql,
       naturalLanguage: request.naturalLanguageQuery,
     };
   } catch (error) {
@@ -738,4 +771,39 @@ function levenshteinDistance(str1: string, str2: string): number {
   }
   
   return matrix[str2.length][str1.length];
+}
+
+// Function to automatically fix mathematical safety issues in SQL
+function fixMathematicalSafety(sql: string): string {
+  let fixedSql = sql;
+  
+  // Pattern 1: Fix profit margin calculations specifically
+  // Look for (value1 - value2) / value1 * 100 patterns
+  const profitMarginPattern = /\(\s*(\w+\.\w+)\s*-\s*(\w+\.\w+)\s*\)\s*\/\s*(\w+\.\w+)\s*\*\s*100/gi;
+  fixedSql = fixedSql.replace(profitMarginPattern, (match, saleRate1, cost, saleRate2) => {
+    // Check if it's the same field being used as denominator
+    if (saleRate1 === saleRate2) {
+      return `CASE WHEN ${saleRate2} > 0 THEN (${saleRate1} - ISNULL(${cost}, 0)) / ${saleRate2} * 100.0 ELSE 0 END`;
+    }
+    return match; // Return original if pattern doesn't match expected structure
+  });
+  
+  // Pattern 2: Fix any other division operations that might cause divide by zero
+  // Look for direct division patterns like column1 / column2
+  const divisionPattern = /(\w+\.\w+|\w+)\s*\/\s*(\w+\.\w+|\w+)(?!\s*\*)/gi;
+  fixedSql = fixedSql.replace(divisionPattern, (match, numerator, denominator) => {
+    // Skip if this is already wrapped in CASE WHEN or NULLIF
+    const beforeMatch = sql.substring(0, sql.indexOf(match));
+    if (beforeMatch.includes('CASE WHEN') || beforeMatch.includes('NULLIF')) {
+      return match;
+    }
+    
+    // Apply NULLIF protection
+    return `${numerator} / NULLIF(${denominator}, 0)`;
+  });
+  
+  // Pattern 3: Fix multiplication by 100 to use 100.0 for decimal precision
+  fixedSql = fixedSql.replace(/\*\s*100(?![.0-9])/g, '* 100.0');
+  
+  return fixedSql;
 }
