@@ -192,8 +192,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recent queries management
+  const recentQueries: Array<{
+    id: string;
+    naturalLanguageQuery: string;
+    sql: string;
+    timestamp: string;
+    executionTime?: number;
+    resultCount?: number;
+  }> = [];
+
+  // Get recent queries
+  app.get("/api/recent-queries", async (req, res) => {
+    try {
+      // Return the 10 most recent queries
+      const recent = recentQueries
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        .slice(0, 10);
+      res.json({ queries: recent });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recent queries" });
+    }
+  });
+
+  // Add to recent queries
+  app.post("/api/recent-queries", async (req, res) => {
+    try {
+      const { naturalLanguageQuery, sql, executionTime, resultCount } = req.body;
+      
+      const newQuery = {
+        id: Date.now().toString(),
+        naturalLanguageQuery,
+        sql,
+        timestamp: new Date().toISOString(),
+        executionTime,
+        resultCount
+      };
+
+      // Add to beginning and keep only last 50
+      recentQueries.unshift(newQuery);
+      if (recentQueries.length > 50) {
+        recentQueries.splice(50);
+      }
+
+      res.json(newQuery);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save recent query" });
+    }
+  });
+
+  // Clear recent queries
+  app.delete("/api/recent-queries", async (req, res) => {
+    try {
+      recentQueries.length = 0;
+      res.json({ message: "Recent queries cleared" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear recent queries" });
+    }
+  });
+
+  // Saved queries management
+  const savedQueries: Array<{
+    id: string;
+    name: string;
+    description: string;
+    naturalLanguageQuery: string;
+    sql: string;
+    createdAt: string;
+    lastUsed?: string;
+  }> = [
+    {
+      id: '1',
+      name: 'Product Performance',
+      description: 'Analyze best performing products by sales',
+      naturalLanguageQuery: 'Show me the top 10 products by total sales amount',
+      sql: 'SELECT TOP 10 ItemCode, SUM(SalesProductTotalAmount) as TotalSales FROM [Sales] WHERE company_id IS NOT NULL AND typestatus = 200 GROUP BY ItemCode ORDER BY TotalSales DESC',
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      lastUsed: '1 day ago'
+    },
+    {
+      id: '2',
+      name: 'Top Customer Analysis',
+      description: 'Top customers with annual order values',
+      naturalLanguageQuery: 'Show me top 5 customers by total order value',
+      sql: 'SELECT TOP 5 CustomerCode, SUM(SalesProductTotalAmount) as TotalValue FROM [Sales] WHERE company_id IS NOT NULL AND typestatus = 200 GROUP BY CustomerCode ORDER BY TotalValue DESC',
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      lastUsed: '3 days ago'
+    },
+    {
+      id: '3',
+      name: 'Monthly Sales Report',
+      description: 'Monthly sales data for current month',
+      naturalLanguageQuery: 'Show monthly sales data for the current month',
+      sql: 'SELECT MONTH(SalesDate) as Month, SUM(SalesProductTotalAmount) as MonthlySales FROM [Sales] WHERE company_id IS NOT NULL AND typestatus = 200 AND YEAR(SalesDate) = YEAR(GETDATE()) GROUP BY MONTH(SalesDate) ORDER BY Month',
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      lastUsed: '1 week ago'
+    }
+  ];
+
   // Get saved queries
   app.get("/api/saved-queries", async (req, res) => {
+    try {
+      res.json({ queries: savedQueries });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch saved queries" });
+    }
+  });
+
+  // Save a new query
+  app.post("/api/saved-queries", async (req, res) => {
+    try {
+      const { name, description, naturalLanguageQuery, sql } = req.body;
+      
+      const newSavedQuery = {
+        id: Date.now().toString(),
+        name,
+        description,
+        naturalLanguageQuery,
+        sql,
+        createdAt: new Date().toISOString()
+      };
+
+      savedQueries.unshift(newSavedQuery);
+      res.json(newSavedQuery);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save query" });
+    }
+  });
+
+  // Delete a saved query
+  app.delete("/api/saved-queries/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const index = savedQueries.findIndex(q => q.id === id);
+      
+      if (index === -1) {
+        return res.status(404).json({ error: "Query not found" });
+      }
+
+      savedQueries.splice(index, 1);
+      res.json({ message: "Query deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete query" });
+    }
+  });
+
+  // Get saved queries (legacy endpoint)
+  app.get("/api/saved-queries-legacy", async (req, res) => {
     try {
       // Mock saved queries (in production, fetch from database)
       const savedQueries = [
