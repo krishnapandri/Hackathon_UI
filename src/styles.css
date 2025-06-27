@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* {
+  font-family: 'Inter', sans-serif;
+}
+
+:root {
+  --primary: 37 99 235;
+  --primary-foreground: 255 255 255;
+  --background: 255 255 255;
+  --foreground: 23 23 23;
+  --muted: 245 245 245;
+  --muted-foreground: 115 115 115;
+  --border: 229 229 229;
+  --neutral-50: 250 250 250;
+  --neutral-100: 245 245 245;
+  --neutral-200: 229 229 229;
+  --neutral-300: 212 212 212;
+  --neutral-400: 163 163 163;
+  --neutral-500: 115 115 115;
+  --neutral-600: 82 82 82;
+  --neutral-700: 64 64 64;
+  --neutral-800: 38 38 38;
+  --neutral-900: 23 23 23;
+  --blue-50: 239 246 255;
+  --blue-100: 219 234 254;
+  --blue-200: 191 219 254;
+  --blue-300: 147 197 253;
+  --blue-400: 96 165 250;
+  --blue-500: 59 130 246;
+  --blue-600: 37 99 235;
+  --blue-700: 29 78 216;
+  --blue-800: 30 64 175;
+  --blue-900: 30 58 138;
+  --green-50: 240 253 244;
+  --green-100: 220 252 231;
+  --green-200: 187 247 208;
+  --green-300: 134 239 172;
+  --green-400: 74 222 128;
+  --green-500: 34 197 94;
+  --green-600: 22 163 74;
+  --green-700: 21 128 61;
+  --green-800: 22 101 52;
+  --green-900: 20 83 45;
+  --red-50: 254 242 242;
+  --red-100: 254 226 226;
+  --red-200: 254 202 202;
+  --red-300: 252 165 165;
+  --red-400: 248 113 113;
+  --red-500: 239 68 68;
+  --red-600: 220 38 38;
+  --red-700: 185 28 28;
+  --red-800: 153 27 27;
+  --red-900: 127 29 29;
+}
+
+.text-primary { color: rgb(var(--primary)); }
+.bg-primary { background-color: rgb(var(--primary)); }
+.border-primary { border-color: rgb(var(--primary)); }
+
+.bg-neutral-50 { background-color: rgb(var(--neutral-50)); }
+.bg-neutral-100 { background-color: rgb(var(--neutral-100)); }
+.bg-neutral-200 { background-color: rgb(var(--neutral-200)); }
+.bg-neutral-900 { background-color: rgb(var(--neutral-900)); }
+
+.text-neutral-400 { color: rgb(var(--neutral-400)); }
+.text-neutral-500 { color: rgb(var(--neutral-500)); }
+.text-neutral-600 { color: rgb(var(--neutral-600)); }
+.text-neutral-700 { color: rgb(var(--neutral-700)); }
+.text-neutral-800 { color: rgb(var(--neutral-800)); }
+
+.border-neutral-100 { border-color: rgb(var(--neutral-100)); }
+.border-neutral-200 { border-color: rgb(var(--neutral-200)); }
+.border-neutral-300 { border-color: rgb(var(--neutral-300)); }
+
+.bg-blue-50 { background-color: rgb(var(--blue-50)); }
+.bg-blue-100 { background-color: rgb(var(--blue-100)); }
+.bg-blue-600 { background-color: rgb(var(--blue-600)); }
+.bg-blue-700 { background-color: rgb(var(--blue-700)); }
+
+.text-blue-600 { color: rgb(var(--blue-600)); }
+.text-blue-800 { color: rgb(var(--blue-800)); }
+
+.border-blue-200 { border-color: rgb(var(--blue-200)); }
+.border-blue-300 { border-color: rgb(var(--blue-300)); }
+.border-blue-500 { border-color: rgb(var(--blue-500)); }
+
+.bg-green-600 { background-color: rgb(var(--green-600)); }
+.bg-green-700 { background-color: rgb(var(--green-700)); }
+
+.bg-red-50 { background-color: rgb(var(--red-50)); }
+.border-red-200 { border-color: rgb(var(--red-200)); }
+.text-red-400 { color: rgb(var(--red-400)); }
+.text-red-800 { color: rgb(var(--red-800)); }
+
+.text-green-400 { color: rgb(var(--green-400)); }
+
+.hover\:bg-neutral-50:hover { background-color: rgb(var(--neutral-50)); }
+.hover\:bg-blue-50:hover { background-color: rgb(var(--blue-50)); }
+.hover\:bg-blue-700:hover { background-color: rgb(var(--blue-700)); }
+.hover\:bg-green-700:hover { background-color: rgb(var(--green-700)); }
+.hover\:border-neutral-300:hover { border-color: rgb(var(--neutral-300)); }
+.hover\:text-neutral-700:hover { color: rgb(var(--neutral-700)); }
+
+.focus\:ring-blue-300:focus { --tw-ring-color: rgb(var(--blue-300)); }
+.focus\:ring-blue-500:focus { --tw-ring-color: rgb(var(--blue-500)); }
+.focus\:border-transparent:focus { border-color: transparent; }
+
+.disabled\:bg-neutral-300:disabled { background-color: rgb(var(--neutral-300)); }
+.disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+
+.peer-checked\:bg-blue-600:checked { background-color: rgb(var(--blue-600)); }
+.peer-focus\:ring-blue-300:focus { --tw-ring-color: rgb(var(--blue-300)); }

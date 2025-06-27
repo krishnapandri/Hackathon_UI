@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import NotFound from "@/pages/not-found";
 import QueryBuilder from "@/pages/query-builder";
 import EnhancedQueryBuilder from "@/pages/enhanced-query-builder";
-import { Database, Sparkles } from "lucide-react";
+import AIQueryBuilder from "@/pages/ai-query-builder";
+import { Database, Sparkles, Bot } from "lucide-react";
 
 function Navigation() {
   const [location] = useLocation();
@@ -38,6 +39,15 @@ function Navigation() {
               Advanced Builder
             </Button>
           </Link>
+          <Link href="/ai-builder">
+            <Button 
+              variant={location === "/ai-builder" ? "default" : "ghost"} 
+              size="sm"
+            >
+              <Bot className="h-4 w-4 mr-2" />
+              AI Query Builder
+            </Button>
+          </Link>
         </div>
       </div>
     </nav>
@@ -51,6 +61,7 @@ function Router() {
       <Switch>
         <Route path="/" component={QueryBuilder} />
         <Route path="/enhanced" component={EnhancedQueryBuilder} />
+        <Route path="/ai-builder" component={AIQueryBuilder} />
         <Route component={NotFound} />
       </Switch>
     </>
