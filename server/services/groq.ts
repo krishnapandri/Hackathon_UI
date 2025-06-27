@@ -390,35 +390,43 @@ export async function validateAndFixQuery(sqlQuery: string, request: SqlQueryReq
         }
       }
       
-      // Fix 2: Handle invalid column names by falling back to * 
+      // Fix 2: Handle invalid column names by searching schema for correct columns
       if (error instanceof Error && (error.message.includes('Invalid column name') || error.message.includes('could not be bound'))) {
-        console.log("🔧 Falling back to SELECT * due to column issues");
+        console.log("🔧 Searching schema for correct column names");
         
-        const mainTable = request.selectedTables[0];
-        if (mainTable) {
-          const tableAlias = mainTable.toLowerCase().substring(0, 2);
+        const fixedQueryResult = await findAndFixInvalidColumns(sqlQuery, request, error.message);
+        if (fixedQueryResult) {
+          fixedQuery = fixedQueryResult;
+        } else {
+          // Only fall back to SELECT * if schema search fails
+          console.log("🔧 Schema search failed, falling back to SELECT *");
           
-          // Build a simple SELECT * query with proper WHERE conditions
-          if (mainTable.toLowerCase() === 'sales') {
-            fixedQuery = `SELECT TOP 100 *
+          const mainTable = request.selectedTables[0];
+          if (mainTable) {
+            const tableAlias = mainTable.toLowerCase().substring(0, 2);
+            
+            // Build a simple SELECT * query with proper WHERE conditions
+            if (mainTable.toLowerCase() === 'sales') {
+              fixedQuery = `SELECT TOP 100 *
 FROM [${mainTable}] ${tableAlias}
 WHERE ${tableAlias}.SalesTypeStatus = 200
 ORDER BY ${tableAlias}.SalesDate DESC`;
-          } else if (mainTable.toLowerCase() === 'stock') {
-            fixedQuery = `SELECT TOP 100 *
+            } else if (mainTable.toLowerCase() === 'stock') {
+              fixedQuery = `SELECT TOP 100 *
 FROM [${mainTable}] ${tableAlias}
 WHERE ${tableAlias}.StockTypeStatus = 200
 ORDER BY ${tableAlias}.ItemCode`;
-          } else if (mainTable.toLowerCase() === 'salesreturn') {
-            fixedQuery = `SELECT TOP 100 *
+            } else if (mainTable.toLowerCase() === 'salesreturn') {
+              fixedQuery = `SELECT TOP 100 *
 FROM [${mainTable}] ${tableAlias}
 WHERE ${tableAlias}.SalesReturnTypeStatus = 200
 ORDER BY ${tableAlias}.SalesReturnDate DESC`;
-          } else {
-            // Generic fallback
-            fixedQuery = `SELECT TOP 100 *
+            } else {
+              // Generic fallback
+              fixedQuery = `SELECT TOP 100 *
 FROM [${mainTable}] ${tableAlias}
 ORDER BY 1`;
+            }
           }
         }
       }
@@ -446,4 +454,200 @@ ORDER BY 1`;
     // If validation system fails, return original query
     return sqlQuery;
   }
+}
+
+// Intelligent column matching function to fix invalid column names
+async function findAndFixInvalidColumns(sqlQuery: string, request: SqlQueryRequest, errorMessage: string): Promise<string | null> {
+  try {
+    // Get the actual schema for the tables being queried
+    const tableMetadata = await storage.getTableMetadata();
+    
+    // Extract invalid column name from error message
+    const invalidColumnMatch = errorMessage.match(/Invalid column name '([^']+)'/);
+    const invalidColumn = invalidColumnMatch ? invalidColumnMatch[1] : null;
+    
+    console.log(`🔍 Looking for replacement for invalid column: ${invalidColumn}`);
+    
+    if (!invalidColumn) {
+      return null;
+    }
+    
+    // Find the table being queried
+    const mainTable = request.selectedTables[0];
+    if (!mainTable) {
+      return null;
+    }
+    
+    const tableSchema = tableMetadata.tables.find(t => t.name.toLowerCase() === mainTable.toLowerCase());
+    if (!tableSchema) {
+      console.log(`❌ Schema not found for table: ${mainTable}`);
+      return null;
+    }
+    
+    // Smart column matching - find similar columns in the schema
+    const availableColumns = tableSchema.columns.map(c => c.name);
+    console.log(`📋 Available columns in ${mainTable}:`, availableColumns.slice(0, 10), '...');
+    
+    let replacementColumn = null;
+    
+    // Strategy 1: Exact match (case insensitive)
+    replacementColumn = availableColumns.find(col => 
+      col.toLowerCase() === invalidColumn.toLowerCase()
+    );
+    
+    // Strategy 2: Find columns containing the invalid column name
+    if (!replacementColumn) {
+      replacementColumn = availableColumns.find(col => 
+        col.toLowerCase().includes(invalidColumn.toLowerCase()) || 
+        invalidColumn.toLowerCase().includes(col.toLowerCase())
+      );
+    }
+    
+    // Strategy 3: Find similar named columns for common patterns
+    if (!replacementColumn) {
+      const commonMappings: { [key: string]: string[] } = {
+        'companytypestatus': ['CompanyTypeStatus', 'TypeStatus', 'Status', 'CompanyStatus'],
+        'stocktypestatus': ['StockTypeStatus', 'TypeStatus', 'Status', 'StockStatus'],
+        'salestypestatus': ['SalesTypeStatus', 'TypeStatus', 'Status', 'SalesStatus'],
+        'itemcode': ['ItemCode', 'Code', 'Item', 'ProductCode'],
+        'stockqty': ['StockQty', 'Qty', 'Quantity', 'Stock'],
+        'stockmrp': ['StockMRP', 'MRP', 'Price', 'Amount']
+      };
+      
+      const invalidColumnLower = invalidColumn.toLowerCase();
+      const possibleReplacements = commonMappings[invalidColumnLower] || [];
+      
+      for (const possibility of possibleReplacements) {
+        const found = availableColumns.find(col => 
+          col.toLowerCase() === possibility.toLowerCase()
+        );
+        if (found) {
+          replacementColumn = found;
+          break;
+        }
+      }
+    }
+    
+    // Strategy 4: Use fuzzy matching for similar column names
+    if (!replacementColumn) {
+      const similarities = availableColumns.map(col => ({
+        column: col,
+        score: calculateSimilarity(invalidColumn.toLowerCase(), col.toLowerCase())
+      }));
+      
+      // Sort by similarity score and pick the best match if it's good enough
+      similarities.sort((a, b) => b.score - a.score);
+      if (similarities[0]?.score > 0.6) {
+        replacementColumn = similarities[0].column;
+      }
+    }
+    
+    if (replacementColumn) {
+      console.log(`✅ Found replacement: ${invalidColumn} → ${replacementColumn}`);
+      
+      // Replace the invalid column in the SQL query
+      const tableAlias = mainTable.toLowerCase().substring(0, 2);
+      let fixedQuery = sqlQuery;
+      
+      // Replace various formats the column might appear in
+      const patterns = [
+        new RegExp(`\\b${tableAlias}\\.\\[?${invalidColumn}\\]?\\b`, 'gi'),
+        new RegExp(`\\[${mainTable}\\]\\.\\[${invalidColumn}\\]`, 'gi'),
+        new RegExp(`\\b${invalidColumn}\\b`, 'gi')
+      ];
+      
+      for (const pattern of patterns) {
+        fixedQuery = fixedQuery.replace(pattern, `${tableAlias}.[${replacementColumn}]`);
+      }
+      
+      console.log(`🔧 Fixed query with replacement column`);
+      return fixedQuery;
+    } else {
+      console.log(`❌ No suitable replacement found for column: ${invalidColumn}`);
+      
+      // If we can't find a replacement for a specific column, 
+      // try to build a working query with commonly available columns
+      const tableAlias = mainTable.toLowerCase().substring(0, 2);
+      const commonColumns = ['ItemCode', 'ItemDescription', 'Amount', 'Qty', 'Date', 'ID', 'Code', 'Name'];
+      const workingColumns = commonColumns.filter(commonCol => 
+        availableColumns.some(availCol => 
+          availCol.toLowerCase().includes(commonCol.toLowerCase())
+        )
+      );
+      
+      if (workingColumns.length > 0) {
+        const actualColumns = workingColumns.map(commonCol => 
+          availableColumns.find(availCol => 
+            availCol.toLowerCase().includes(commonCol.toLowerCase())
+          )
+        ).filter(Boolean);
+        
+        const columnList = actualColumns.slice(0, 5).map(col => `${tableAlias}.[${col}]`).join(', ');
+        
+        let whereClause = '';
+        if (mainTable.toLowerCase() === 'sales' && availableColumns.some(c => c.toLowerCase().includes('salestypestatus'))) {
+          const statusCol = availableColumns.find(c => c.toLowerCase().includes('salestypestatus'));
+          whereClause = `WHERE ${tableAlias}.[${statusCol}] = 200`;
+        } else if (mainTable.toLowerCase() === 'stock' && availableColumns.some(c => c.toLowerCase().includes('stocktypestatus'))) {
+          const statusCol = availableColumns.find(c => c.toLowerCase().includes('stocktypestatus'));
+          whereClause = `WHERE ${tableAlias}.[${statusCol}] = 200`;
+        }
+        
+        const fallbackQuery = `SELECT ${columnList}
+FROM [${mainTable}] ${tableAlias}
+${whereClause}
+ORDER BY ${tableAlias}.[${actualColumns[0]}]`;
+        
+        console.log(`🔧 Built fallback query with available columns`);
+        return fallbackQuery;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error in intelligent column matching:', error);
+    return null;
+  }
+}
+
+// Calculate similarity between two strings (simple implementation)
+function calculateSimilarity(str1: string, str2: string): number {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) {
+    return 1.0;
+  }
+  
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+}
+
+// Calculate Levenshtein distance between two strings
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
 }
