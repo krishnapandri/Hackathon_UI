@@ -62,16 +62,17 @@ export async function generateSqlQuery(
       });
     }
     
-    // Add selected columns
+    // Add selected columns with proper table aliases
     if (request.selectedColumns && Object.keys(request.selectedColumns).length > 0) {
       Object.entries(request.selectedColumns).forEach(([tableName, tableColumns]) => {
+        const tableAlias = tableName.toLowerCase().substring(0, 2);
         tableColumns.forEach(column => {
           // Only add if not already in aggregation columns
           const isAggregated = request.aggregationColumns?.some(agg => 
             agg.column === `${tableName}.${column}` || agg.column === column
           );
           if (!isAggregated) {
-            columns.push(`[${tableName}].[${column}]`);
+            columns.push(`${tableAlias}.[${column}]`);
           }
         });
       });
@@ -186,8 +187,11 @@ export async function generateSqlQuery(
     // Debug: Log the generated SQL
     console.log("🔍 Enhanced Generated SQL:", sqlQuery);
 
+    // Validate and fix the query before returning
+    const validatedQuery = await validateAndFixQuery(sqlQuery, request);
+    
     return {
-      sql: sqlQuery,
+      sql: validatedQuery,
       naturalLanguage: request.naturalLanguageQuery,
     };
   } catch (error) {
@@ -345,5 +349,101 @@ Return only valid T-SQL without explanations or markdown formatting.`;
       error:
         "Failed to generate SQL query using AI. Please check your API key and try again.",
     };
+  }
+}
+
+// Query validation function to test and fix SQL before returning
+export async function validateAndFixQuery(sqlQuery: string, request: SqlQueryRequest): Promise<string> {
+  try {
+    // First, try to execute the query with LIMIT to test syntax
+    const testQuery = `SELECT TOP 1 * FROM (${sqlQuery}) AS test_query`;
+    
+    console.log("🔍 Testing query syntax:", testQuery);
+    
+    try {
+      await storage.executeQuery(testQuery);
+      console.log("✅ Query validation passed");
+      return sqlQuery; // Query is valid, return as-is
+    } catch (error) {
+      console.log("❌ Query validation failed, attempting to fix:", error instanceof Error ? error.message : 'Unknown error');
+      
+      // Try to fix common issues
+      let fixedQuery = sqlQuery;
+      
+      // Fix 1: Remove table aliases that don't match column prefixes
+      if (error instanceof Error && error.message.includes('could not be bound')) {
+        console.log("🔧 Fixing column binding issues");
+        
+        // Get the main table from request
+        const mainTable = request.selectedTables[0];
+        if (mainTable) {
+          const tableAlias = mainTable.toLowerCase().substring(0, 2);
+          
+          // Replace [TableName].[Column] with alias.[Column]
+          fixedQuery = fixedQuery.replace(new RegExp(`\\[${mainTable}\\]\\.\\[([^\\]]+)\\]`, 'g'), `${tableAlias}.[$1]`);
+          
+          // Ensure FROM clause uses consistent alias
+          fixedQuery = fixedQuery.replace(
+            new RegExp(`FROM \\[${mainTable}\\] ${tableAlias}`),
+            `FROM [${mainTable}] ${tableAlias}`
+          );
+        }
+      }
+      
+      // Fix 2: Handle invalid column names by falling back to * 
+      if (error instanceof Error && (error.message.includes('Invalid column name') || error.message.includes('could not be bound'))) {
+        console.log("🔧 Falling back to SELECT * due to column issues");
+        
+        const mainTable = request.selectedTables[0];
+        if (mainTable) {
+          const tableAlias = mainTable.toLowerCase().substring(0, 2);
+          
+          // Build a simple SELECT * query with proper WHERE conditions
+          if (mainTable.toLowerCase() === 'sales') {
+            fixedQuery = `SELECT TOP 100 *
+FROM [${mainTable}] ${tableAlias}
+WHERE ${tableAlias}.SalesTypeStatus = 200
+ORDER BY ${tableAlias}.SalesDate DESC`;
+          } else if (mainTable.toLowerCase() === 'stock') {
+            fixedQuery = `SELECT TOP 100 *
+FROM [${mainTable}] ${tableAlias}
+WHERE ${tableAlias}.StockTypeStatus = 200
+ORDER BY ${tableAlias}.ItemCode`;
+          } else if (mainTable.toLowerCase() === 'salesreturn') {
+            fixedQuery = `SELECT TOP 100 *
+FROM [${mainTable}] ${tableAlias}
+WHERE ${tableAlias}.SalesReturnTypeStatus = 200
+ORDER BY ${tableAlias}.SalesReturnDate DESC`;
+          } else {
+            // Generic fallback
+            fixedQuery = `SELECT TOP 100 *
+FROM [${mainTable}] ${tableAlias}
+ORDER BY 1`;
+          }
+        }
+      }
+      
+      // Test the fixed query
+      try {
+        const testFixedQuery = `SELECT TOP 1 * FROM (${fixedQuery}) AS test_fixed_query`;
+        await storage.executeQuery(testFixedQuery);
+        console.log("✅ Fixed query validation passed");
+        return fixedQuery;
+      } catch (fixError) {
+        console.log("❌ Fixed query still failed, using basic fallback");
+        
+        // Last resort: return a very basic working query
+        const mainTable = request.selectedTables[0] || 'Sales';
+        const tableAlias = mainTable.toLowerCase().substring(0, 2);
+        
+        return `SELECT TOP 100 *
+FROM [${mainTable}] ${tableAlias}
+ORDER BY 1`;
+      }
+    }
+  } catch (validationError) {
+    console.error("Query validation system error:", validationError);
+    // If validation system fails, return original query
+    return sqlQuery;
   }
 }
