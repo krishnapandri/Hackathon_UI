@@ -287,7 +287,8 @@ CRITICAL RULES - MUST BE FOLLOWED:
 - For matrix queries, generate proper pivot/unpivot or case statements
 - Use ORDER BY for sorted results
 - Consider using window functions for analytical queries
-- Only use TOP clause if specifically requested (avoid default TOP 100)
+- NEVER use TOP clause unless the user explicitly requests a specific number (like "top 5", "first 10", "limit to 20")
+- When user says "highest" or "lowest" without a number, use ORDER BY without TOP clause
 
 MANDATORY WHERE CONDITIONS:
 When querying Sales view: WHERE s.CompanyTypeStatus IS NOT NULL AND s.SalesTypeStatus = 200
@@ -301,6 +302,10 @@ FROM [view_name] alias
 WHERE alias.CompanyTypeStatus IS NOT NULL AND alias.[ViewType]Status = 200
   AND [additional_conditions]
 [ORDER BY clause]
+
+IMPORTANT: Only add TOP N if user explicitly mentions:
+- "top 5", "first 10", "limit 20", "show me 15", etc.
+- DO NOT add TOP when user says "highest", "lowest", "best", "worst" without a number
 
 Note: All database objects are views. When user asks for "table" data, query the corresponding view.
 
