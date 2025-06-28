@@ -1,5 +1,6 @@
 import { SqlQueryRequest, SqlQueryResponse } from "@shared/schema";
 import { storage } from "../storage";
+import { simpleQueryValidator } from "./query-validator-simple";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -153,9 +154,23 @@ export async function generateGroqQuery(
   const sql = completion.choices[0]?.message?.content?.trim() || "";
   const cleanSql = sql.replace(/```sql\n?/g, "").replace(/```\n?/g, "").trim();
 
+  // Comprehensive query validation and correction
+  const validationResult = await simpleQueryValidator.validateAndCorrectQuery(cleanSql, request);
+  
+  let finalSql = validationResult.correctedQuery || cleanSql;
+  let responseWithWarnings = request.naturalLanguageQuery;
+  
+  // Add validation warnings to response if any
+  if (validationResult.warnings.length > 0) {
+    console.log("🔧 Groq query validation warnings:", validationResult.warnings);
+    responseWithWarnings += ` (Note: ${validationResult.warnings.join(', ')})`;
+  }
+  
+  console.log("✅ Groq final validated SQL:", finalSql);
+
   return {
-    sql: cleanSql,
-    naturalLanguage: request.naturalLanguageQuery,
+    sql: finalSql,
+    naturalLanguage: responseWithWarnings,
   };
 }
 
@@ -203,9 +218,23 @@ export async function generateHuggingFaceQuery(
 
     const cleanSql = sql.replace(/```sql\n?/g, "").replace(/```\n?/g, "").trim();
 
+    // Comprehensive query validation and correction
+    const validationResult = await simpleQueryValidator.validateAndCorrectQuery(cleanSql, request);
+    
+    let finalSql = validationResult.correctedQuery || cleanSql;
+    let responseWithWarnings = request.naturalLanguageQuery;
+    
+    // Add validation warnings to response if any
+    if (validationResult.warnings.length > 0) {
+      console.log("🔧 HuggingFace query validation warnings:", validationResult.warnings);
+      responseWithWarnings += ` (Note: ${validationResult.warnings.join(', ')})`;
+    }
+    
+    console.log("✅ HuggingFace final validated SQL:", finalSql);
+
     return {
-      sql: cleanSql,
-      naturalLanguage: request.naturalLanguageQuery,
+      sql: finalSql,
+      naturalLanguage: responseWithWarnings,
     };
   } catch (error) {
     console.error("Hugging Face API error:", error);
@@ -263,9 +292,23 @@ export async function generateOpenRouterQuery(
   const sql = data.choices[0]?.message?.content?.trim() || "";
   const cleanSql = sql.replace(/```sql\n?/g, "").replace(/```\n?/g, "").trim();
 
+  // Comprehensive query validation and correction
+  const validationResult = await simpleQueryValidator.validateAndCorrectQuery(cleanSql, request);
+  
+  let finalSql = validationResult.correctedQuery || cleanSql;
+  let responseWithWarnings = request.naturalLanguageQuery;
+  
+  // Add validation warnings to response if any
+  if (validationResult.warnings.length > 0) {
+    console.log("🔧 OpenRouter query validation warnings:", validationResult.warnings);
+    responseWithWarnings += ` (Note: ${validationResult.warnings.join(', ')})`;
+  }
+  
+  console.log("✅ OpenRouter final validated SQL:", finalSql);
+
   return {
-    sql: cleanSql,
-    naturalLanguage: request.naturalLanguageQuery,
+    sql: finalSql,
+    naturalLanguage: responseWithWarnings,
   };
 }
 
@@ -326,9 +369,23 @@ WHERE s.CompanyTypeStatus IS NOT NULL AND s.SalesTypeStatus = 200
 ORDER BY s.SalesDate DESC`;
   }
 
+  // Comprehensive query validation and correction
+  const validationResult = await simpleQueryValidator.validateAndCorrectQuery(sql, request);
+  
+  let finalSql = validationResult.correctedQuery || sql;
+  let responseWithWarnings = request.naturalLanguageQuery;
+  
+  // Add validation warnings to response if any
+  if (validationResult.warnings.length > 0) {
+    console.log("🔧 Local template validation warnings:", validationResult.warnings);
+    responseWithWarnings += ` (Note: ${validationResult.warnings.join(', ')})`;
+  }
+  
+  console.log("✅ Local template final validated SQL:", finalSql);
+
   return {
-    sql: sql,
-    naturalLanguage: request.naturalLanguageQuery,
+    sql: finalSql,
+    naturalLanguage: responseWithWarnings,
   };
 }
 

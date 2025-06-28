@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { SqlQueryRequest, SqlQueryResponse } from "@shared/schema";
 import { storage } from "../storage";
+import { simpleQueryValidator } from "./query-validator-simple";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -451,17 +452,34 @@ Return only valid T-SQL without explanations or markdown formatting.`;
 
     console.log("🤖 AI Generated SQL:", cleanSql);
 
-    // Post-process the SQL to fix common mathematical safety issues
-    const safeSql = fixMathematicalSafety(cleanSql);
+    // Comprehensive query validation and correction
+    const validationResult = await simpleQueryValidator.validateAndCorrectQuery(cleanSql, request);
     
-    if (safeSql !== cleanSql) {
-      console.log("🔧 Applied mathematical safety fixes to AI-generated SQL");
-      console.log("🔧 Safe SQL:", safeSql);
+    let finalSql = validationResult.correctedQuery || cleanSql;
+    let responseWithWarnings = request.naturalLanguageQuery;
+    
+    // Add validation warnings to response if any
+    if (validationResult.warnings.length > 0) {
+      console.log("🔧 Query validation warnings:", validationResult.warnings);
+      responseWithWarnings += ` (Note: ${validationResult.warnings.join(', ')})`;
     }
+    
+    if (validationResult.errors.length > 0) {
+      console.log("❌ Query validation errors:", validationResult.errors);
+    }
+    
+    // Apply additional mathematical safety fixes
+    const safeSql = fixMathematicalSafety(finalSql);
+    
+    if (safeSql !== finalSql) {
+      console.log("🔧 Applied additional mathematical safety fixes");
+    }
+    
+    console.log("✅ Final validated SQL:", safeSql);
 
     return {
       sql: safeSql,
-      naturalLanguage: request.naturalLanguageQuery,
+      naturalLanguage: responseWithWarnings,
     };
   } catch (error) {
     console.error("Groq AI error:", error);
