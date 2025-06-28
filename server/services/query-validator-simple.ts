@@ -146,14 +146,14 @@ export class SimpleQueryValidator {
   private fixCommonColumnIssues(query: string): string {
     let fixed = query;
 
-    // Remove problematic table aliases
-    fixed = fixed.replace(/(\w+)\s+[a-z]\b/gi, '$1');
-    fixed = fixed.replace(/\b[a-z]\./gi, '');
-
-    // Fix common column name variations
+    // DO NOT remove table aliases - they are necessary for proper SQL execution
+    // The previous code was incorrectly removing valid table aliases and prefixes
+    
+    // Only fix actual column name variations if needed
     const commonFixes = [
       [/CompanyTypeStatus/gi, 'CompanyTypeStatus'],
-      [/SalesTypeStatus/gi, 'SalesTypeStatus'],
+      [/SalesTypeStatus/gi, 'SalesTypeStatus'], 
+      [/StockTypeStatus/gi, 'StockTypeStatus'],
       [/TypeStatus/gi, 'TypeStatus']
     ];
 
