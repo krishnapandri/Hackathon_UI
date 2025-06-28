@@ -410,6 +410,21 @@ WHERE alias.CompanyTypeStatus IS NOT NULL AND alias.[ViewType]Status = 200
   AND [additional_conditions]
 [ORDER BY clause]
 
+STOCK ANALYSIS QUERY PATTERNS (USE THESE PATTERNS):
+For stock grouping by item and color with current stock quantity:
+SELECT st.ItemCode, st.ItemDescription, st.ColorName, SUM(st.StockQty) AS CurrentStockQty
+FROM Stock st
+WHERE st.CompanyTypeStatus IS NOT NULL AND st.StockTypeStatus = 200
+GROUP BY st.ItemCode, st.ItemDescription, st.ColorName
+ORDER BY CurrentStockQty DESC
+
+For general stock queries:
+SELECT st.ItemCode, st.ItemDescription, SUM(st.StockQty) AS TotalStock
+FROM Stock st
+WHERE st.CompanyTypeStatus IS NOT NULL AND st.StockTypeStatus = 200
+GROUP BY st.ItemCode, st.ItemDescription
+ORDER BY TotalStock DESC
+
 PROFIT MARGIN CALCULATION EXAMPLE (USE THIS PATTERN):
 For profit margin queries, ALWAYS use this safe pattern:
 SELECT s.ItemCode, s.ItemDescription,
@@ -430,7 +445,31 @@ Note: All database objects are views. When user asks for "table" data, query the
 
 Return only valid T-SQL without explanations or markdown formatting.`;
 
-    const userPrompt = `Generate SQL Server T-SQL query for: ${request.naturalLanguageQuery}`;
+    // Enhance user prompt with context for better accuracy
+    let enhancedPrompt = `Generate SQL Server T-SQL query for: ${request.naturalLanguageQuery}`;
+    
+    // Add specific context based on query type
+    const queryLower = request.naturalLanguageQuery.toLowerCase();
+    if (queryLower.includes('stock') && queryLower.includes('color') && (queryLower.includes('group') || queryLower.includes('item'))) {
+      enhancedPrompt += `\n\nSpecific Requirements: 
+      - Use Stock view for current stock quantities
+      - Group by ItemCode, ItemDescription, and ColorName
+      - Use SUM(StockQty) for aggregated stock quantities
+      - Include mandatory WHERE conditions for Stock view
+      - Return columns: ItemCode, ItemDescription, ColorName, CurrentStockQty`;
+    } else if (queryLower.includes('stock') || queryLower.includes('inventory')) {
+      enhancedPrompt += `\n\nSpecific Requirements:
+      - Use Stock view for stock-related data
+      - Include mandatory WHERE conditions: CompanyTypeStatus IS NOT NULL AND StockTypeStatus = 200
+      - Consider grouping by relevant columns like ItemCode, ItemDescription`;
+    } else if (queryLower.includes('sales') || queryLower.includes('revenue')) {
+      enhancedPrompt += `\n\nSpecific Requirements:
+      - Use Sales view for sales-related data  
+      - Include mandatory WHERE conditions: CompanyTypeStatus IS NOT NULL AND SalesTypeStatus = 200
+      - Consider using aggregation functions like SUM, COUNT, AVG for sales metrics`;
+    }
+    
+    const userPrompt = enhancedPrompt;
 
     const completion = await groq.chat.completions.create({
       messages: [
