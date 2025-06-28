@@ -350,11 +350,20 @@ WHERE s.CompanyTypeStatus IS NOT NULL AND s.SalesTypeStatus = 200
 GROUP BY s.ItemCode, s.ItemDescription
 ORDER BY TotalSalesAmount DESC`;
   } else if (query.includes("stock") || query.includes("inventory")) {
-    sql = `SELECT st.ItemCode, st.ItemDescription, SUM(st.StockQty) AS TotalStock
+    if (query.includes("color") && (query.includes("group") || query.includes("item"))) {
+      // Specific handling for item and color grouping with stock
+      sql = `SELECT st.ItemCode, st.ItemDescription, st.ColorName, SUM(st.StockQty) AS CurrentStockQty
+FROM Stock st
+WHERE st.CompanyTypeStatus IS NOT NULL AND st.StockTypeStatus = 200
+GROUP BY st.ItemCode, st.ItemDescription, st.ColorName
+ORDER BY CurrentStockQty DESC`;
+    } else {
+      sql = `SELECT st.ItemCode, st.ItemDescription, SUM(st.StockQty) AS TotalStock
 FROM Stock st
 WHERE st.CompanyTypeStatus IS NOT NULL AND st.StockTypeStatus = 200
 GROUP BY st.ItemCode, st.ItemDescription
 ORDER BY TotalStock DESC`;
+    }
   } else if (query.includes("customer") || query.includes("client")) {
     sql = `SELECT s.CustomerName, COUNT(*) AS OrderCount, SUM(s.SalesProductTotalAmount) AS TotalAmount
 FROM Sales s
@@ -437,6 +446,16 @@ SQL Server Specific Syntax:
 - Use CONCAT() or + for string concatenation
 - Use CAST() or CONVERT() for data type conversions
 - Use appropriate SQL Server date formats and functions
+
+STOCK ANALYSIS QUERY PATTERNS:
+For stock grouping queries (item, color, quantity):
+- Always use Stock view for current stock quantities
+- Common stock columns: ItemCode, ItemDescription, ColorName, StockQty, CategoryName
+- For grouping by item and color: GROUP BY ItemCode, ItemDescription, ColorName
+- Use SUM(StockQty) for total stock quantities when grouping
+- Sample pattern: SELECT ItemCode, ItemDescription, ColorName, SUM(StockQty) AS CurrentStockQty FROM Stock WHERE ... GROUP BY ItemCode, ItemDescription, ColorName
+- For stock levels by category: GROUP BY CategoryName, ItemCode
+- Always include proper WHERE conditions for Stock view: CompanyTypeStatus IS NOT NULL AND StockTypeStatus = 200
 `;
 
   return `You are an expert Microsoft SQL Server query generator. Generate valid T-SQL queries based on natural language requests.

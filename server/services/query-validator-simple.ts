@@ -338,18 +338,36 @@ export class SimpleQueryValidator {
       return "SELECT 'No data available' as Message;";
     }
 
-    const firstTable = this.tableMetadata.tables[0];
+    const query = request.naturalLanguageQuery.toLowerCase();
     const rulesConfig = (global as any).rulesConfig || {
       queryConfig: {
         defaultConditions: ["CompanyTypeStatus IS NOT NULL", "SalesTypeStatus = 200"],
       },
     };
 
-    // Use first few columns
-    const columns = firstTable.columns.slice(0, 5).map((col: any) => col.name).join(', ');
-    const whereClause = rulesConfig.queryConfig.defaultConditions.join(' AND ');
-    
-    return `SELECT TOP 10 ${columns} FROM ${firstTable.name} WHERE ${whereClause};`;
+    // Generate specific fallback based on query type
+    if (query.includes("stock") && query.includes("color") && (query.includes("group") || query.includes("item"))) {
+      // Stock grouping by item and color
+      return `SELECT ItemCode, ItemDescription, ColorName, SUM(StockQty) AS CurrentStockQty
+FROM Stock
+WHERE CompanyTypeStatus IS NOT NULL AND StockTypeStatus = 200
+GROUP BY ItemCode, ItemDescription, ColorName
+ORDER BY CurrentStockQty DESC;`;
+    } else if (query.includes("stock") || query.includes("inventory")) {
+      // General stock query
+      return `SELECT TOP 10 ItemCode, ItemDescription, SUM(StockQty) AS TotalStock
+FROM Stock
+WHERE CompanyTypeStatus IS NOT NULL AND StockTypeStatus = 200
+GROUP BY ItemCode, ItemDescription
+ORDER BY TotalStock DESC;`;
+    } else {
+      // Default fallback
+      const firstTable = this.tableMetadata.tables[0];
+      const columns = firstTable.columns.slice(0, 5).map((col: any) => col.name).join(', ');
+      const whereClause = rulesConfig.queryConfig.defaultConditions.join(' AND ');
+      
+      return `SELECT TOP 10 ${columns} FROM ${firstTable.name} WHERE ${whereClause};`;
+    }
   }
 }
 
